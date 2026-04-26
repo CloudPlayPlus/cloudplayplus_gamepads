@@ -135,17 +135,22 @@ void Gamepads::init() {
               self->on_gamepad_disconnected(device);
             }
           },
-          this->deviceCallbackToken);
+          &this->deviceCallbackToken);
     }
   }
 }
 
 void Gamepads::stop() {
-  if (g_gamepad)
+  if (g_gamepad) {
     g_gamepad->Release();
+    g_gamepad = nullptr;
+  }
   if (g_gameInput) {
-    g_gameInput->UnregisterCallback(*this->deviceCallbackToken, 5000);
+    if (this->deviceCallbackToken != 0) {
+      g_gameInput->UnregisterCallback(this->deviceCallbackToken, 5000u);
+    }
     g_gameInput->Release();
+    g_gameInput = nullptr;
   }
 
   // Stop/cleanup threads
