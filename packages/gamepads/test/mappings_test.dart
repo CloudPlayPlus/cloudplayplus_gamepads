@@ -13,22 +13,10 @@ void main() {
     final mapping = IosMapping();
 
     test('normalizes face buttons', () {
-      expect(
-        mapping.normalizeButton('buttonA', 1.0)?.button,
-        GamepadButton.a,
-      );
-      expect(
-        mapping.normalizeButton('buttonB', 1.0)?.button,
-        GamepadButton.b,
-      );
-      expect(
-        mapping.normalizeButton('buttonX', 1.0)?.button,
-        GamepadButton.x,
-      );
-      expect(
-        mapping.normalizeButton('buttonY', 1.0)?.button,
-        GamepadButton.y,
-      );
+      expect(mapping.normalizeButton('buttonA', 1.0)?.button, GamepadButton.a);
+      expect(mapping.normalizeButton('buttonB', 1.0)?.button, GamepadButton.b);
+      expect(mapping.normalizeButton('buttonX', 1.0)?.button, GamepadButton.x);
+      expect(mapping.normalizeButton('buttonY', 1.0)?.button, GamepadButton.y);
     });
 
     test('normalizes shoulder buttons', () {
@@ -109,16 +97,20 @@ void main() {
     });
 
     test('preserves stick axis values', () {
-      final leftX = mapping.normalizeAxis(
-        'leftStick - xAxis',
-        0.75,
-      );
+      final leftX = mapping.normalizeAxis('leftStick - xAxis', 0.75);
       expect(leftX.first.value, 0.75);
-      final leftY = mapping.normalizeAxis(
-        'leftStick - yAxis',
-        -0.5,
-      );
+      final leftY = mapping.normalizeAxis('leftStick - yAxis', -0.5);
       expect(leftY.first.value, -0.5);
+    });
+
+    test('normalizes trigger axes', () {
+      final leftTrigger = mapping.normalizeAxis('leftTrigger', 0.75);
+      expect(leftTrigger.first.axis, GamepadAxis.leftTrigger);
+      expect(leftTrigger.first.value, 0.75);
+
+      final rightTrigger = mapping.normalizeAxis('rightTrigger', 0.4);
+      expect(rightTrigger.first.axis, GamepadAxis.rightTrigger);
+      expect(rightTrigger.first.value, 0.4);
     });
 
     test('returns null for unknown axes', () {
@@ -202,19 +194,22 @@ void main() {
       );
     });
 
-    test('normalizes stick axes with Y inversion', () {
+    test('preserves stick axes from the Android plugin', () {
       final lx = mapping.normalizeAxis('AXIS_X', 0.5);
       expect(lx.first.axis, GamepadAxis.leftStickX);
       expect(lx.first.value, 0.5);
 
-      // Y-axis should be inverted
       final ly = mapping.normalizeAxis('AXIS_Y', 0.5);
       expect(ly.first.axis, GamepadAxis.leftStickY);
-      expect(ly.first.value, -0.5);
+      expect(ly.first.value, 0.5);
+
+      final rx = mapping.normalizeAxis('AXIS_Z', -0.25);
+      expect(rx.first.axis, GamepadAxis.rightStickX);
+      expect(rx.first.value, -0.25);
 
       final ry = mapping.normalizeAxis('AXIS_RZ', -1.0);
       expect(ry.first.axis, GamepadAxis.rightStickY);
-      expect(ry.first.value, 1.0);
+      expect(ry.first.value, -1.0);
     });
 
     test('normalizes trigger axes', () {
@@ -245,8 +240,13 @@ void main() {
       expect(right[1].button, GamepadButton.dpadRight);
       expect(right[1].value, 1.0);
 
-      // Android hat Y: positive = down
-      final down = mapping.normalizeDpadAxis('AXIS_HAT_Y', 1.0);
+      final up = mapping.normalizeDpadAxis('AXIS_HAT_Y', 1.0);
+      expect(up[0].button, GamepadButton.dpadDown);
+      expect(up[0].value, 0.0);
+      expect(up[1].button, GamepadButton.dpadUp);
+      expect(up[1].value, 1.0);
+
+      final down = mapping.normalizeDpadAxis('AXIS_HAT_Y', -1.0);
       expect(down[0].button, GamepadButton.dpadDown);
       expect(down[0].value, 1.0);
       expect(down[1].button, GamepadButton.dpadUp);
@@ -317,22 +317,10 @@ void main() {
     final mapping = MacosMapping();
 
     test('normalizes Xbox-style face buttons', () {
-      expect(
-        mapping.normalizeButton('a.circle', 1.0)?.button,
-        GamepadButton.a,
-      );
-      expect(
-        mapping.normalizeButton('b.circle', 1.0)?.button,
-        GamepadButton.b,
-      );
-      expect(
-        mapping.normalizeButton('x.circle', 1.0)?.button,
-        GamepadButton.x,
-      );
-      expect(
-        mapping.normalizeButton('y.circle', 1.0)?.button,
-        GamepadButton.y,
-      );
+      expect(mapping.normalizeButton('a.circle', 1.0)?.button, GamepadButton.a);
+      expect(mapping.normalizeButton('b.circle', 1.0)?.button, GamepadButton.b);
+      expect(mapping.normalizeButton('x.circle', 1.0)?.button, GamepadButton.x);
+      expect(mapping.normalizeButton('y.circle', 1.0)?.button, GamepadButton.y);
     });
 
     test('normalizes DualSense PlayStation-style face buttons', () {
@@ -365,10 +353,7 @@ void main() {
       );
       expect(
         mapping
-            .normalizeButton(
-              'rectangle.fill.on.rectangle.fill.circle',
-              1.0,
-            )
+            .normalizeButton('rectangle.fill.on.rectangle.fill.circle', 1.0)
             ?.button,
         GamepadButton.back,
       );
@@ -501,10 +486,7 @@ void main() {
         productId: 0x9999,
       );
       // Should still work with default Xbox-like mapping
-      expect(
-        mapping.normalizeButton('0', 1.0)?.button,
-        GamepadButton.a,
-      );
+      expect(mapping.normalizeButton('0', 1.0)?.button, GamepadButton.a);
     });
 
     test('strict mode returns null for unknown controllers', () {
@@ -520,14 +502,8 @@ void main() {
         vendorId: 0x045e,
         productId: 0x028e,
       );
-      expect(
-        mapping.normalizeButton('0', 1.0)?.button,
-        GamepadButton.a,
-      );
-      expect(
-        mapping.normalizeButton('1', 1.0)?.button,
-        GamepadButton.b,
-      );
+      expect(mapping.normalizeButton('0', 1.0)?.button, GamepadButton.a);
+      expect(mapping.normalizeButton('1', 1.0)?.button, GamepadButton.b);
     });
 
     test('normalizes stick axis values from raw range', () {
@@ -566,14 +542,8 @@ void main() {
   group('WindowsMapping', () {
     test('normalizes buttons', () {
       final mapping = WindowsMapping();
-      expect(
-        mapping.normalizeButton('a', 1.0)?.button,
-        GamepadButton.a,
-      );
-      expect(
-        mapping.normalizeButton('b', 1.0)?.button,
-        GamepadButton.b,
-      );
+      expect(mapping.normalizeButton('a', 1.0)?.button, GamepadButton.a);
+      expect(mapping.normalizeButton('b', 1.0)?.button, GamepadButton.b);
     });
 
     test('normalizes axis values from -1.0 to 1.0 range', () {

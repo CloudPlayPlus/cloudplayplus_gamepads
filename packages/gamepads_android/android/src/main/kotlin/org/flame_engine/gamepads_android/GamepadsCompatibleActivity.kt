@@ -6,12 +6,26 @@ import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
 
+private val blockedGamepadDeviceNames = setOf(
+    "uinput-goodix",
+    "uinput-xiaomi",
+    "Xiaomi Consumer",
+)
+
 interface GamepadsCompatibleActivity {
     fun isGamepadsInputDevice(device: InputDevice): Boolean {
-        return device.sources and InputDevice.SOURCE_GAMEPAD == InputDevice.SOURCE_GAMEPAD
-                || device.sources and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK
-                // Some bluetooth keyboards are identified as GamePad. Check if it is ALPHABETIC keyboard.
-                && device.keyboardType != InputDevice.KEYBOARD_TYPE_ALPHABETIC
+        if (blockedGamepadDeviceNames.contains(device.name.trim())) {
+            return false
+        }
+
+        val hasGamepadSource =
+            device.sources and InputDevice.SOURCE_GAMEPAD == InputDevice.SOURCE_GAMEPAD
+        val hasJoystickSource =
+            device.sources and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK
+        val isAlphabeticKeyboard =
+            device.keyboardType == InputDevice.KEYBOARD_TYPE_ALPHABETIC
+
+        return (hasGamepadSource || hasJoystickSource) && !isAlphabeticKeyboard
     }
 
     fun registerInputDeviceListener(listener: InputManager.InputDeviceListener, handler: Handler?)

@@ -59,10 +59,8 @@ class AndroidMapping extends PlatformMapping {
       return const [];
     }
     // Android reports sticks in -1.0 to 1.0 and triggers in 0.0 to 1.0.
-    // Y-axis is inverted on Android (up = negative).
-    if (axis == GamepadAxis.leftStickY || axis == GamepadAxis.rightStickY) {
-      return [NormalizedAxis(axis, -value)];
-    }
+    // The Android plugin emits stick axes in the CloudPlayPlus target
+    // convention already, so Dart must not flip them again.
     return [NormalizedAxis(axis, value)];
   }
 
@@ -71,19 +69,13 @@ class AndroidMapping extends PlatformMapping {
     if (key == _dpadXAxis) {
       return [
         NormalizedButton(GamepadButton.dpadLeft, value < 0 ? 1.0 : 0.0),
-        NormalizedButton(
-          GamepadButton.dpadRight,
-          value > 0 ? 1.0 : 0.0,
-        ),
+        NormalizedButton(GamepadButton.dpadRight, value > 0 ? 1.0 : 0.0),
       ];
     }
     if (key == _dpadYAxis) {
       return [
-        NormalizedButton(
-          GamepadButton.dpadDown,
-          value > 0 ? 1.0 : 0.0,
-        ),
-        NormalizedButton(GamepadButton.dpadUp, value < 0 ? 1.0 : 0.0),
+        NormalizedButton(GamepadButton.dpadDown, value < 0 ? 1.0 : 0.0),
+        NormalizedButton(GamepadButton.dpadUp, value > 0 ? 1.0 : 0.0),
       ];
     }
     return const [];
