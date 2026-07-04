@@ -194,22 +194,22 @@ void main() {
       );
     });
 
-    test('normalizes stick axes with CloudPlayPlus Android corrections', () {
+    test('preserves stick axes from the Android plugin', () {
       final lx = mapping.normalizeAxis('AXIS_X', 0.5);
       expect(lx.first.axis, GamepadAxis.leftStickX);
-      expect(lx.first.value, -0.5);
+      expect(lx.first.value, 0.5);
 
       final ly = mapping.normalizeAxis('AXIS_Y', 0.5);
       expect(ly.first.axis, GamepadAxis.leftStickY);
-      expect(ly.first.value, -0.5);
+      expect(ly.first.value, 0.5);
 
       final rx = mapping.normalizeAxis('AXIS_Z', -0.25);
       expect(rx.first.axis, GamepadAxis.rightStickX);
-      expect(rx.first.value, 0.25);
+      expect(rx.first.value, -0.25);
 
       final ry = mapping.normalizeAxis('AXIS_RZ', -1.0);
       expect(ry.first.axis, GamepadAxis.rightStickY);
-      expect(ry.first.value, 1.0);
+      expect(ry.first.value, -1.0);
     });
 
     test('normalizes trigger axes', () {

@@ -108,24 +108,21 @@ void main() {
         expect(results.first.button, GamepadButton.a);
       });
 
-      test(
-        'normalizes Android horizontal axis with CloudPlayPlus correction',
-        () {
-          final event = GamepadEvent(
-            gamepadId: 'pad1',
-            timestamp: 1000,
-            type: KeyType.analog,
-            key: 'AXIS_X',
-            value: 1.0,
-          );
+      test('preserves Android horizontal axis from plugin', () {
+        final event = GamepadEvent(
+          gamepadId: 'pad1',
+          timestamp: 1000,
+          type: KeyType.analog,
+          key: 'AXIS_X',
+          value: 1.0,
+        );
 
-          final results = normalizer.normalize(event);
-          expect(results.first.axis, GamepadAxis.leftStickX);
-          expect(results.first.value, -1.0);
-        },
-      );
+        final results = normalizer.normalize(event);
+        expect(results.first.axis, GamepadAxis.leftStickX);
+        expect(results.first.value, 1.0);
+      });
 
-      test('normalizes Android axis with Y inversion', () {
+      test('preserves Android vertical axis from plugin', () {
         final event = GamepadEvent(
           gamepadId: 'pad1',
           timestamp: 1000,
@@ -136,7 +133,7 @@ void main() {
 
         final results = normalizer.normalize(event);
         expect(results.first.axis, GamepadAxis.leftStickY);
-        expect(results.first.value, -1.0);
+        expect(results.first.value, 1.0);
       });
     });
 

@@ -59,14 +59,8 @@ class AndroidMapping extends PlatformMapping {
       return const [];
     }
     // Android reports sticks in -1.0 to 1.0 and triggers in 0.0 to 1.0.
-    // CloudPlayPlus Android devices report horizontal stick axes mirrored
-    // relative to the XInput target convention.
-    if (axis == GamepadAxis.leftStickX || axis == GamepadAxis.rightStickX) {
-      return [NormalizedAxis(axis, -value)];
-    }
-    if (axis == GamepadAxis.leftStickY || axis == GamepadAxis.rightStickY) {
-      return [NormalizedAxis(axis, -value)];
-    }
+    // The Android plugin emits stick axes in the CloudPlayPlus target
+    // convention already, so Dart must not flip them again.
     return [NormalizedAxis(axis, value)];
   }
 
