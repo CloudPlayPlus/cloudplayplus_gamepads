@@ -45,6 +45,22 @@ void main() {
         expect(results.first.value, 0.75);
       });
 
+      test('normalizes analog trigger event', () {
+        final event = GamepadEvent(
+          gamepadId: 'pad1',
+          timestamp: 2500,
+          type: KeyType.analog,
+          key: 'leftTrigger',
+          value: 0.6,
+        );
+
+        final results = normalizer.normalize(event);
+        expect(results.length, 1);
+        expect(results.first.axis, GamepadAxis.leftTrigger);
+        expect(results.first.button, isNull);
+        expect(results.first.value, 0.6);
+      });
+
       test('d-pad axis produces multiple button events', () {
         final event = GamepadEvent(
           gamepadId: 'pad1',
@@ -76,9 +92,7 @@ void main() {
     });
 
     group('Android platform', () {
-      final normalizer = GamepadNormalizer.forPlatform(
-        GamepadPlatform.android,
-      );
+      final normalizer = GamepadNormalizer.forPlatform(GamepadPlatform.android);
 
       test('normalizes Android button', () {
         final event = GamepadEvent(
@@ -93,6 +107,23 @@ void main() {
         expect(results.length, 1);
         expect(results.first.button, GamepadButton.a);
       });
+
+      test(
+        'normalizes Android horizontal axis with CloudPlayPlus correction',
+        () {
+          final event = GamepadEvent(
+            gamepadId: 'pad1',
+            timestamp: 1000,
+            type: KeyType.analog,
+            key: 'AXIS_X',
+            value: 1.0,
+          );
+
+          final results = normalizer.normalize(event);
+          expect(results.first.axis, GamepadAxis.leftStickX);
+          expect(results.first.value, -1.0);
+        },
+      );
 
       test('normalizes Android axis with Y inversion', () {
         final event = GamepadEvent(
@@ -182,14 +213,8 @@ void main() {
 
     group('device-specific mappings', () {
       test('setDeviceInfo selects controller-specific mapping', () {
-        final normalizer = GamepadNormalizer.forPlatform(
-          GamepadPlatform.linux,
-        );
-        normalizer.setDeviceInfo(
-          'pad1',
-          vendorId: 0x045e,
-          productId: 0x028e,
-        );
+        final normalizer = GamepadNormalizer.forPlatform(GamepadPlatform.linux);
+        normalizer.setDeviceInfo('pad1', vendorId: 0x045e, productId: 0x028e);
 
         final event = GamepadEvent(
           gamepadId: 'pad1',

@@ -29,6 +29,8 @@ class IosMapping extends PlatformMapping {
     'leftStick - yAxis': GamepadAxis.leftStickY,
     'rightStick - xAxis': GamepadAxis.rightStickX,
     'rightStick - yAxis': GamepadAxis.rightStickY,
+    'leftTrigger': GamepadAxis.leftTrigger,
+    'rightTrigger': GamepadAxis.rightTrigger,
   };
 
   // D-pad is reported as analog axes on iOS.
