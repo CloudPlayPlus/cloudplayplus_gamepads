@@ -6,6 +6,14 @@ public class GamepadsIosPlugin: NSObject, FlutterPlugin {
   private var channel: FlutterMethodChannel!
   private var controllerIds = [GCController: Int]()
   private var nextControllerId = 1
+  private var rumbleBackend: Any?
+  @available(iOS 14.0, *)
+  private var rumble: GamepadRumble {
+    if let value = rumbleBackend as? GamepadRumble { return value }
+    let value = GamepadRumble()
+    rumbleBackend = value
+    return value
+  }
 
   public static func register(with registrar: FlutterPluginRegistrar) {
     let instance = GamepadsIosPlugin()
@@ -32,7 +40,18 @@ public class GamepadsIosPlugin: NSObject, FlutterPlugin {
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-    if call.method == "listGamepads" {
+    if ["hasRumble", "rumble", "stopRumble"].contains(call.method) {
+      guard #available(iOS 14.0, *), let args = call.arguments as? [String: Any],
+            let id = args["gamepadId"] as? String, let number = Int(id),
+            let controller = controllerIds.first(where: { $0.value == number })?.key
+            else { result(false); return }
+      if call.method == "hasRumble" { result(rumble.has(controller)); return }
+      if call.method == "stopRumble" { rumble.stop(controller); result(true); return }
+      guard let low = args["lowFrequency"] as? Double,
+            let high = args["highFrequency"] as? Double,
+            let duration = args["durationMillis"] as? Int else { result(false); return }
+      result(rumble.set(controller, low: low, high: high, duration: duration))
+    } else if call.method == "listGamepads" {
       let gamepads = controllerIds.compactMap { (controller, id) -> [String: Any]? in
         guard let vendorName = controller.vendorName else { return nil }
         return [

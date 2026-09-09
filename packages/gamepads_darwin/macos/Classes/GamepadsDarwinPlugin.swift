@@ -12,12 +12,21 @@ enum FixedKey: String {
 public class GamepadsDarwinPlugin: NSObject, FlutterPlugin {
     let channel: FlutterMethodChannel
     let gamepads = GamepadsListener()
+    private var rumbleBackend: Any?
+    @available(macOS 11.0, iOS 14.0, *)
+    private var rumble: GamepadRumble {
+        if let value = rumbleBackend as? GamepadRumble { return value }
+        let value = GamepadRumble()
+        rumbleBackend = value
+        return value
+    }
 
     init(channel: FlutterMethodChannel) {
         self.channel = channel
         super.init()
 
         self.gamepads.listener = onGamepadEvent
+        self.gamepads.discoverConnectedControllers()
     }
 
     public static func register(with registrar: FlutterPluginRegistrar) {
@@ -28,6 +37,19 @@ public class GamepadsDarwinPlugin: NSObject, FlutterPlugin {
 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
+        case "hasRumble", "rumble", "stopRumble":
+            guard #available(macOS 11.0, iOS 14.0, *),
+                  let args = call.arguments as? [String: Any],
+                  let id = args["gamepadId"] as? String,
+                  let index = Int(id),
+                  let gamepad = gamepads.gamepad(for: index),
+                  let controller = gamepad.controller else { result(false); return }
+            if call.method == "hasRumble" { result(rumble.has(controller)); return }
+            if call.method == "stopRumble" { rumble.stop(controller); result(true); return }
+            guard let low = args["lowFrequency"] as? Double,
+                  let high = args["highFrequency"] as? Double,
+                  let duration = args["durationMillis"] as? Int else { result(false); return }
+            result(rumble.set(controller, low: low, high: high, duration: duration))
         case "listGamepads":
             result(listGamepads())
         default:
@@ -146,7 +168,7 @@ public class GamepadsDarwinPlugin: NSObject, FlutterPlugin {
 
     private func listGamepads() -> [[String: Any?]] {
         return gamepads.gamepads.enumerated().map { (index, gamepad) in
-            [ "id": String(index), "name": getName(gamepad: gamepad) ]
+            [ "id": String(gamepads.id(for: gamepad)), "name": getName(gamepad: gamepad) ]
         }
     }
 

@@ -1,3 +1,7 @@
+## Unreleased
+
+- Add controller rumble capability queries, finite dual-motor effects, and stop support.
+
 ## 0.1.10+2
 
  - Update a dependency to the latest release.
