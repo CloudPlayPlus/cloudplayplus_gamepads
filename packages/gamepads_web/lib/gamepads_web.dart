@@ -8,6 +8,7 @@ import 'package:gamepads_platform_interface/api/gamepad_event.dart';
 import 'package:gamepads_platform_interface/gamepads_platform_interface.dart';
 import 'package:gamepads_web/src/gamepad_detector.dart'
     show getGamepadList, getGamepads;
+import 'package:gamepads_web/src/gamepad_rumble.dart';
 import 'package:web/web.dart' as web;
 
 class _GamepadState {
@@ -51,6 +52,21 @@ class _GamepadState {
 
 /// A web implementation of the GamepadsWebPlatform of the GamepadsWeb plugin.
 class GamepadsWeb extends GamepadsPlatformInterface {
+  final _rumble = GamepadRumble();
+  late final JSFunction _visibilityListener;
+
+  @override
+  Future<bool> hasRumble(String gamepadId) async => _rumble.has(gamepadId);
+  @override
+  Future<bool> stopRumble(String gamepadId) => _rumble.stop(gamepadId);
+  @override
+  Future<bool> rumble(
+    String gamepadId, {
+    double lowFrequency = 0,
+    double highFrequency = 0,
+    Duration duration = const Duration(milliseconds: 500),
+  }) => _rumble.set(gamepadId, lowFrequency, highFrequency, duration);
+
   int _gamepadCount = 0;
   Timer? _gamepadPollingTimer;
 
@@ -114,6 +130,12 @@ class GamepadsWeb extends GamepadsPlatformInterface {
   }
 
   GamepadsWeb() {
+    _visibilityListener = ((web.Event event) {
+      if (web.document.hidden) {
+        _rumble.stopAll();
+      }
+    }).toJS;
+    web.document.addEventListener('visibilitychange', _visibilityListener);
     web.window.addEventListener(
       'gamepadconnected',
       (web.Event event) {
@@ -172,6 +194,8 @@ class GamepadsWeb extends GamepadsPlatformInterface {
 
   @mustCallSuper
   Future<void> dispose() async {
+    _rumble.stopAll();
+    web.document.removeEventListener('visibilitychange', _visibilityListener);
     _gamepadEventsStreamController.close();
   }
 }
