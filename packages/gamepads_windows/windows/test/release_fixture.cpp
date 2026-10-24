@@ -14,7 +14,7 @@ struct SlowInput {
 };
 
 extern "C" __declspec(dllexport) void StartRelease(HANDLE gate,
-                                                  HANDLE completed,
-                                                  LONG* calls) {
+                                                   HANDLE completed,
+                                                   LONG* calls) {
   ReleaseGameInputOffThread(new SlowInput{gate, completed, calls});
 }

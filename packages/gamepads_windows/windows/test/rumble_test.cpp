@@ -69,7 +69,8 @@ struct TestInput {
   }
   void UnregisterCallback(GameInputCallbackToken, uint64_t) {}
   void Release() {
-    if (device.references != 0) std::abort();
+    if (device.references != 0)
+      std::abort();
     WaitForSingleObject(release_gate, INFINITE);
     SetEvent(released);
   }
@@ -118,8 +119,10 @@ int main() {
   }
   if (!input.device.WaitForZero(8) || input.device.references != 0)
     return 10;
-  if (WaitForSingleObject(input.released, 0) != WAIT_TIMEOUT) return 11;
+  if (WaitForSingleObject(input.released, 0) != WAIT_TIMEOUT)
+    return 11;
   SetEvent(input.release_gate);
-  if (WaitForSingleObject(input.released, 2000) != WAIT_OBJECT_0) return 12;
+  if (WaitForSingleObject(input.released, 2000) != WAIT_OBJECT_0)
+    return 12;
   return 0;
 }

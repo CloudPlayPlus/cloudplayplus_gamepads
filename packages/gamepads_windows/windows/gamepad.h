@@ -37,8 +37,10 @@ class Gamepads {
     std::thread thread;
     ~Reader() {
       stopping = true;
-      if (thread.joinable()) thread.join();
-      if (device) device->Release();
+      if (thread.joinable())
+        thread.join();
+      if (device)
+        device->Release();
     }
   };
   std::list<std::unique_ptr<Reader>> readers_;

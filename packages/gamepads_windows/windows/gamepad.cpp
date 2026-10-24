@@ -114,7 +114,8 @@ bool are_states_different(const GameInputGamepadState& a,
 
 void Gamepads::init() {
   stopping_ = false;
-  if (FAILED(GameInputCreate(&input_)) || !input_) return;
+  if (FAILED(GameInputCreate(&input_)) || !input_)
+    return;
   const auto hr = input_->RegisterDeviceCallback(
       nullptr, GameInputKindGamepad, GameInputDeviceConnected,
       GameInputAsyncEnumeration, this,
@@ -125,15 +126,18 @@ void Gamepads::init() {
           self->on_gamepad_connected(device);
         else
           self->on_gamepad_disconnected(device);
-      }, &deviceCallbackToken);
-  if (FAILED(hr)) stop();
+      },
+      &deviceCallbackToken);
+  if (FAILED(hr))
+    stop();
 }
 
 void Gamepads::stop() {
   {
     std::lock_guard<std::mutex> lock(mutex_);
     stopping_ = true;
-    for (auto& reader : readers_) reader->stopping = true;
+    for (auto& reader : readers_)
+      reader->stopping = true;
   }
   // 回调可能仍在执行；必须等待结束，才能销毁 this 及读取线程。
   if (input_ && deviceCallbackToken) {
@@ -156,24 +160,29 @@ void Gamepads::stop() {
 std::list<GamepadData> Gamepads::get_gamepads() {
   std::lock_guard<std::mutex> lock(mutex_);
   std::list<GamepadData> result;
-  for (const auto& reader : readers_) result.push_back(reader->data);
+  for (const auto& reader : readers_)
+    result.push_back(reader->data);
   return result;
 }
 
 void Gamepads::on_gamepad_connected(IGameInputDevice* device) {
   const auto* info = device->GetDeviceInfo();
-  if (!info) return;
+  if (!info)
+    return;
   std::lock_guard<std::mutex> lock(mutex_);
-  if (stopping_) return;
+  if (stopping_)
+    return;
   const auto id = AppLocalDeviceIdToString(info->deviceId);
   for (const auto& reader : readers_)
-    if (reader->data.id == id) return;
+    if (reader->data.id == id)
+      return;
   auto reader = std::make_unique<Reader>();
-  reader->data = {id,
-                 info->displayName && info->displayName->data ? info->displayName->data : "",
-                 static_cast<int>(info->controllerButtonCount),
-                 static_cast<int>(info->vendorId),
-                 static_cast<int>(info->productId)};
+  reader->data = {
+      id,
+      info->displayName && info->displayName->data ? info->displayName->data
+                                                   : "",
+      static_cast<int>(info->controllerButtonCount),
+      static_cast<int>(info->vendorId), static_cast<int>(info->productId)};
   device->AddRef();
   reader->device = device;
   auto* raw = reader.get();
@@ -188,7 +197,8 @@ void Gamepads::on_gamepad_connected(IGameInputDevice* device) {
 
 void Gamepads::on_gamepad_disconnected(IGameInputDevice* device) {
   const auto* info = device->GetDeviceInfo();
-  if (!info) return;
+  if (!info)
+    return;
   const auto id = AppLocalDeviceIdToString(info->deviceId);
   std::unique_ptr<Reader> removed;
   {
@@ -214,7 +224,8 @@ void Gamepads::read_gamepad(Reader* reader) {
       if (reading->GetGamepadState(&state) && !reader->stopping) {
         if (are_states_different(previous_state, state)) {
           for (const auto& event : diff_states(previous_state, state)) {
-            if (event_emitter) (*event_emitter)(&reader->data, event);
+            if (event_emitter)
+              (*event_emitter)(&reader->data, event);
           }
         }
         previous_state = state;

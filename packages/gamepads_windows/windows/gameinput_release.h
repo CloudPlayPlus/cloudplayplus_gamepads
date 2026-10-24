@@ -22,14 +22,16 @@ struct GameInputReleaseWork {
 
 template <typename Input>
 void ReleaseGameInputOffThread(Input* input) {
-  if (!input) return;
+  if (!input)
+    return;
   using Work = GameInputReleaseWork<Input>;
   HMODULE module = nullptr;
   if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
-                        reinterpret_cast<LPCWSTR>(&Work::Run), &module)) {
+                         reinterpret_cast<LPCWSTR>(&Work::Run), &module)) {
     auto* work = new (std::nothrow) Work{input, module};
     if (work) {
-      const auto thread = CreateThread(nullptr, 0, &Work::Run, work, 0, nullptr);
+      const auto thread =
+          CreateThread(nullptr, 0, &Work::Run, work, 0, nullptr);
       if (thread) {
         CloseHandle(thread);
         return;
