@@ -2,6 +2,7 @@
 
 #include <windows.h>
 #include <GameInput.h>
+#include "gameinput_release.h"
 #include <chrono>
 #include <condition_variable>
 #include <iomanip>
@@ -10,7 +11,7 @@
 #include <sstream>
 #include <thread>
 
-// Owns device references independently of input polling. No detached work may
+// Owns device references independently of input polling. No motor work may
 // outlive this object, and each motor command has a native expiry.
 class GamepadRumble {
  public:
@@ -26,8 +27,8 @@ class GamepadRumble {
         },
         &token_);
     if (FAILED(hr)) {
-      input_->Release();
-      input_ = nullptr;
+      // 枚举失败时也由析构统一清理已收集的设备，再释放输入对象。
+      token_ = 0;
       return;
     }
     worker_ = std::thread([this] { Expire(); });
@@ -48,7 +49,7 @@ class GamepadRumble {
       item.second.device->Release();
     }
     if (input_)
-      input_->Release();
+      ReleaseGameInputOffThread(input_);
   }
 
   bool Has(const std::string& id) {

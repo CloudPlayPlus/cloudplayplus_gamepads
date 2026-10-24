@@ -5,6 +5,7 @@
 #include <winerror.h>
 
 #include "gamepad.h"
+#include "gameinput_release.h"
 #include "utils.h"
 #include <GameInput.h>
 #include <iomanip>
@@ -12,9 +13,6 @@
 #pragma comment(lib, "GameInput.lib")
 
 Gamepads gamepads;
-
-static IGameInput* g_gameInput = nullptr;
-static IGameInputDevice* g_gamepad = nullptr;
 
 std::string get_button_name(uint32_t button) {
   switch (button) {
@@ -115,142 +113,114 @@ bool are_states_different(const GameInputGamepadState& a,
 }
 
 void Gamepads::init() {
-  GameInputCreate(&g_gameInput);
-
-  if (g_gameInput != nullptr) {
-    // Register listener for gamepad events
-    if (g_gameInput != nullptr) {
-      g_gameInput->RegisterDeviceCallback(
-          nullptr,  // All devices
-          GameInputKindGamepad, GameInputDeviceConnected,
-          GameInputAsyncEnumeration, static_cast<void*>(this),
-          [](_In_ GameInputCallbackToken callbackToken, _In_ void* context,
-             _In_ IGameInputDevice* device, _In_ uint64_t timestamp,
-             _In_ GameInputDeviceStatus currentStatus,
-             _In_ GameInputDeviceStatus previousStatus) {
-            auto* self = static_cast<Gamepads*>(context);
-            if (currentStatus & GameInputDeviceConnected) {
-              self->on_gamepad_connected(device);
-            } else {
-              self->on_gamepad_disconnected(device);
-            }
-          },
-          &this->deviceCallbackToken);
-    }
-  }
+  stopping_ = false;
+  if (FAILED(GameInputCreate(&input_)) || !input_) return;
+  const auto hr = input_->RegisterDeviceCallback(
+      nullptr, GameInputKindGamepad, GameInputDeviceConnected,
+      GameInputAsyncEnumeration, this,
+      [](GameInputCallbackToken, void* context, IGameInputDevice* device,
+         uint64_t, GameInputDeviceStatus status, GameInputDeviceStatus) {
+        auto* self = static_cast<Gamepads*>(context);
+        if (status & GameInputDeviceConnected)
+          self->on_gamepad_connected(device);
+        else
+          self->on_gamepad_disconnected(device);
+      }, &deviceCallbackToken);
+  if (FAILED(hr)) stop();
 }
 
 void Gamepads::stop() {
-  if (g_gamepad) {
-    g_gamepad->Release();
-    g_gamepad = nullptr;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    stopping_ = true;
+    for (auto& reader : readers_) reader->stopping = true;
   }
-  if (g_gameInput) {
-    if (this->deviceCallbackToken != 0) {
-      g_gameInput->UnregisterCallback(this->deviceCallbackToken, 5000u);
-    }
-    g_gameInput->Release();
-    g_gameInput = nullptr;
+  // 回调可能仍在执行；必须等待结束，才能销毁 this 及读取线程。
+  if (input_ && deviceCallbackToken) {
+    input_->UnregisterCallback(deviceCallbackToken, UINT64_MAX);
+    deviceCallbackToken = 0;
   }
-
-  // Stop/cleanup threads
-  for (auto gp : this->gamepads) {
-    if (!gp->stop_thread) {
-      if (gp->alive) {
-        gp->stop_thread = true;
-      } else {
-        // Cleanup data of threads that exited due to error state.
-        delete gp;
-      }
-    }
+  std::list<std::unique_ptr<Reader>> readers;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    readers.swap(readers_);
   }
-  this->gamepads.clear();
+  // Reader 析构先 join 再释放设备，不能在读取仍进行时释放输入对象。
+  readers.clear();
+  event_emitter.reset();
+  auto* input = input_;
+  input_ = nullptr;
+  ReleaseGameInputOffThread(input);
 }
 
-std::list<GamepadData*> Gamepads::get_gamepads() {
-  return this->gamepads;
+std::list<GamepadData> Gamepads::get_gamepads() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  std::list<GamepadData> result;
+  for (const auto& reader : readers_) result.push_back(reader->data);
+  return result;
 }
 
 void Gamepads::on_gamepad_connected(IGameInputDevice* device) {
-  auto info = device->GetDeviceInfo();
-  if (info == nullptr) {
-    std::cerr << "Gamepad connected but failed to read info" << std::endl;
-    return;
+  const auto* info = device->GetDeviceInfo();
+  if (!info) return;
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (stopping_) return;
+  const auto id = AppLocalDeviceIdToString(info->deviceId);
+  for (const auto& reader : readers_)
+    if (reader->data.id == id) return;
+  auto reader = std::make_unique<Reader>();
+  reader->data = {id,
+                 info->displayName && info->displayName->data ? info->displayName->data : "",
+                 static_cast<int>(info->controllerButtonCount),
+                 static_cast<int>(info->vendorId),
+                 static_cast<int>(info->productId)};
+  device->AddRef();
+  reader->device = device;
+  auto* raw = reader.get();
+  // 先登记所有权；回调返回后仍持有设备引用，直到读取线程结束。
+  readers_.push_back(std::move(reader));
+  try {
+    raw->thread = std::thread([this, raw] { read_gamepad(raw); });
+  } catch (...) {
+    readers_.pop_back();
   }
-  auto gp = new GamepadData();
-  gp->id = AppLocalDeviceIdToString(info->deviceId);
-  gp->name = info->displayName != nullptr && info->displayName->data != nullptr
-                 ? info->displayName->data
-                 : "";
-  gp->num_buttons = info->controllerButtonCount;
-  gp->stop_thread = false;
-  gp->alive = true;
-  gp->vendor_id = static_cast<int>(info->vendorId);
-  gp->product_id = static_cast<int>(info->productId);
-  this->gamepads.push_back(gp);
-
-  std::cout << "Gamepad connected: " << gp->id << " : " << gp->name
-            << std::endl;
-
-  std::thread read_thread(
-      [this, gp, device]() { this->read_gamepad(gp, device); });
-  read_thread.detach();
 }
 
 void Gamepads::on_gamepad_disconnected(IGameInputDevice* device) {
-  auto info = device->GetDeviceInfo();
-  if (info == nullptr) {
-    std::cerr << "Gamepad disconnected but failed to read info" << std::endl;
-    return;
-  }
-  std::string removeId = AppLocalDeviceIdToString(info->deviceId);
-  std::cout << "Gamepad disconnected: " << removeId << std::endl;
-  GamepadData* removeGp = nullptr;
-  for (auto gp : this->gamepads) {
-    if (gp->id == removeId) {
-      gp->stop_thread = true;
-      removeGp = gp;
-      break;
+  const auto* info = device->GetDeviceInfo();
+  if (!info) return;
+  const auto id = AppLocalDeviceIdToString(info->deviceId);
+  std::unique_ptr<Reader> removed;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    for (auto it = readers_.begin(); it != readers_.end(); ++it) {
+      if ((*it)->data.id == id) {
+        removed = std::move(*it);
+        readers_.erase(it);
+        break;
+      }
     }
   }
-  // Remove the gamepad from list. The thread will free up memory.
-  if (removeGp != nullptr) {
-    this->gamepads.remove(removeGp);
-  }
+  // 不持列表锁等待线程，查询手柄只返回自有值快照。
 }
 
-void Gamepads::read_gamepad(GamepadData* gamepad, IGameInputDevice* device) {
-  GameInputGamepadState previous_state = {
-      GameInputGamepadNone, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-  while (!gamepad->stop_thread && g_gameInput != nullptr) {
-    IGameInputReading* reading;
-    GameInputGamepadState state;
-    g_gameInput->GetCurrentReading(GameInputKindGamepad, device, &reading);
-    if (reading != nullptr) {
-      if (reading->GetGamepadState(&state)) {
+void Gamepads::read_gamepad(Reader* reader) {
+  GameInputGamepadState previous_state{};
+  while (!reader->stopping) {
+    IGameInputReading* reading = nullptr;
+    GameInputGamepadState state{};
+    input_->GetCurrentReading(GameInputKindGamepad, reader->device, &reading);
+    if (reading) {
+      if (reading->GetGamepadState(&state) && !reader->stopping) {
         if (are_states_different(previous_state, state)) {
-          auto events = diff_states(previous_state, state);
-          for (auto event : events) {
-            if (event_emitter.has_value()) {
-              (*event_emitter)(gamepad, event);
-            }
+          for (const auto& event : diff_states(previous_state, state)) {
+            if (event_emitter) (*event_emitter)(&reader->data, event);
           }
         }
         previous_state = state;
-        reading->Release();
       }
+      reading->Release();
     }
-
     Sleep(8);
-  }
-
-  if (gamepad->stop_thread) {
-    std::cout << "Gamepad thread exit (via signal) " << gamepad->id
-              << std::endl;
-    delete gamepad;
-  } else {
-    std::cout << "Gamepad thread exit (due to error state) " << gamepad->id
-              << std::endl;
-    gamepad->alive = false;
   }
 }
