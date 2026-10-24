@@ -40,6 +40,8 @@ struct TestDevice {
 };
 
 struct TestInput {
+  HANDLE release_gate = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+  HANDLE released = CreateEventW(nullptr, TRUE, FALSE, nullptr);
   using Callback = void (*)(GameInputCallbackToken,
                             void*,
                             TestDevice*,
@@ -66,7 +68,12 @@ struct TestInput {
     callback(1, context, &device, 0, status, GameInputDeviceNoStatus);
   }
   void UnregisterCallback(GameInputCallbackToken, uint64_t) {}
-  void Release() {}
+  void Release() {
+    if (device.references != 0)
+      std::abort();
+    WaitForSingleObject(release_gate, INFINITE);
+    SetEvent(released);
+  }
 };
 
 static TestInput input;
@@ -112,5 +119,10 @@ int main() {
   }
   if (!input.device.WaitForZero(8) || input.device.references != 0)
     return 10;
+  if (WaitForSingleObject(input.released, 0) != WAIT_TIMEOUT)
+    return 11;
+  SetEvent(input.release_gate);
+  if (WaitForSingleObject(input.released, 2000) != WAIT_OBJECT_0)
+    return 12;
   return 0;
 }

@@ -18,6 +18,7 @@ list(APPEND PLUGIN_SOURCES
   "gamepads_windows_plugin.h"
   "gamepad.cpp"
   "gamepad.h"
+  "gameinput_release.h"
   "utils.cpp"
   "utils.h"
 )
@@ -34,6 +35,7 @@ add_library(${PLUGIN_NAME} SHARED
 # application-level CMakeLists.txt. This can be removed for plugins that want
 # full control over build settings.
 apply_standard_settings(${PLUGIN_NAME})
+target_compile_options(${PLUGIN_NAME} PRIVATE /utf-8)
 
 # Symbols are hidden by default to reduce the chance of accidental conflicts
 # between plugins. This should not be removed; any symbols that should be

@@ -1,4 +1,4 @@
-
+#pragma once
 #include <wtypes.h>
 
 #include <windows.h>
@@ -8,13 +8,15 @@
 #include <map>
 #include <optional>
 #include <GameInput.h>
+#include <atomic>
+#include <memory>
+#include <mutex>
+#include <thread>
 
 struct GamepadData {
   std::string id;
   std::string name;
   int num_buttons;
-  bool stop_thread;
-  bool alive;
   int vendor_id;
   int product_id;
 };
@@ -28,10 +30,26 @@ struct Event {
 
 class Gamepads {
  private:
-  std::list<GamepadData*> gamepads;
+  struct Reader {
+    GamepadData data;
+    IGameInputDevice* device = nullptr;
+    std::atomic<bool> stopping{false};
+    std::thread thread;
+    ~Reader() {
+      stopping = true;
+      if (thread.joinable())
+        thread.join();
+      if (device)
+        device->Release();
+    }
+  };
+  std::list<std::unique_ptr<Reader>> readers_;
+  std::mutex mutex_;
+  bool stopping_ = false;
+  IGameInput* input_ = nullptr;
 
   GameInputCallbackToken deviceCallbackToken{};
-  void read_gamepad(GamepadData* gamepad, IGameInputDevice* device);
+  void read_gamepad(Reader* reader);
 
   void on_gamepad_connected(IGameInputDevice* device);
   void on_gamepad_disconnected(IGameInputDevice* device);
@@ -41,7 +59,7 @@ class Gamepads {
       event_emitter;
   void init();
   void stop();
-  std::list<GamepadData*> get_gamepads();
+  std::list<GamepadData> get_gamepads();
 };
 
 extern Gamepads gamepads;
