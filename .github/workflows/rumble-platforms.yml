@@ -61,6 +61,10 @@ jobs:
       - name: Configure Windows rumble regression
         if: matrix.platform == 'windows'
         run: cmake -S packages/gamepads_windows/windows/test -B build/rumble-test
+      - name: Run Android device detection regression
+        if: matrix.platform == 'android'
+        working-directory: packages/gamepads/example/android
+        run: ./gradlew :gamepads_android:testDebugUnitTest
       - name: Build Windows rumble regression
         if: matrix.platform == 'windows'
         run: cmake --build build/rumble-test --config Release
