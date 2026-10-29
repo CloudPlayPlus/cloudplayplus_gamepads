@@ -46,7 +46,7 @@ public class GamepadsIosPlugin: NSObject, FlutterPlugin {
             let controller = controllerIds.first(where: { $0.value == number })?.key
             else { result(false); return }
       if call.method == "hasRumble" { result(rumble.has(controller)); return }
-      if call.method == "stopRumble" { rumble.stop(controller); result(true); return }
+      if call.method == "stopRumble" { result(rumble.stop(controller)); return }
       guard let low = args["lowFrequency"] as? Double,
             let high = args["highFrequency"] as? Double,
             let duration = args["durationMillis"] as? Int else { result(false); return }

@@ -13,6 +13,22 @@ permissions:
   contents: read
 
 jobs:
+  apple-rumble-regressions:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify shared Apple implementation and failure handling
+        run: |
+          for source in GamepadRumble RumbleEffect RumbleDiagnostics; do
+            cmp "packages/gamepads_darwin/macos/Classes/$source.swift" "packages/gamepads_ios/ios/Classes/$source.swift"
+          done
+          swiftc packages/gamepads_darwin/macos/Classes/RumbleEffect.swift packages/gamepads_darwin/macos/Tests/RumbleEffectTests.swift -o "$RUNNER_TEMP/rumble-tests"
+          "$RUNNER_TEMP/rumble-tests"
+      - name: Typecheck Apple APIs with production logging enabled
+        run: |
+          swiftc -typecheck -D CPP_LOG_AVAILABLE packages/gamepads_darwin/macos/Classes/{GamepadRumble,RumbleEffect,RumbleDiagnostics}.swift
+          xcrun --sdk iphonesimulator swiftc -typecheck -D CPP_LOG_AVAILABLE -sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" -target arm64-apple-ios14.0-simulator packages/gamepads_ios/ios/Classes/{GamepadRumble,RumbleEffect,RumbleDiagnostics}.swift
   build:
     strategy:
       fail-fast: false
