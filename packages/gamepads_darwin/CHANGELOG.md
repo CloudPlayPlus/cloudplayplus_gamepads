@@ -1,5 +1,7 @@
 ## Unreleased
 
+- Reuse Apple haptic players for amplitude updates, with native expiry, lifecycle cleanup, and optional cpp_log diagnostics.
+
 - Add controller rumble capability queries, finite dual-motor effects, and stop support.
 
 ## 0.1.2+4

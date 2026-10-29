@@ -45,7 +45,7 @@ public class GamepadsDarwinPlugin: NSObject, FlutterPlugin {
                   let gamepad = gamepads.gamepad(for: index),
                   let controller = gamepad.controller else { result(false); return }
             if call.method == "hasRumble" { result(rumble.has(controller)); return }
-            if call.method == "stopRumble" { rumble.stop(controller); result(true); return }
+            if call.method == "stopRumble" { result(rumble.stop(controller)); return }
             guard let low = args["lowFrequency"] as? Double,
                   let high = args["highFrequency"] as? Double,
                   let duration = args["durationMillis"] as? Int else { result(false); return }
