@@ -42,8 +42,8 @@ private final class AppleRumbleEngine: RumbleEngine {
             with: CHHapticPattern(events: [event], parameters: [])))
     }
     func shutdown() {
-        engine.stoppedHandler = nil
-        engine.resetHandler = nil
+        engine.stoppedHandler = { _ in }
+        engine.resetHandler = {}
         engine.stop { [log] error in
             if let error = error { log("engine_stop_failed", error) }
         }
