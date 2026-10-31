@@ -28,15 +28,11 @@ interface GamepadsCompatibleActivity {
             return false
         }
 
-        // 部分真手柄同时声明字母键盘；有摇杆轴时不能仅凭 keyboardType 拒绝。
-        // 与 flame-engine/gamepads #127 的识别规则保持一致。
-        val hasJoystickAxes = device.motionRanges.any {
-            it.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK
-        }
+        // 复合蓝牙键盘也可能声明 JOYSTICK 轴，不能据此消费它的文字按键。
         val isAlphabeticKeyboard =
             device.keyboardType == InputDevice.KEYBOARD_TYPE_ALPHABETIC
 
-        return !isAlphabeticKeyboard || hasJoystickAxes
+        return !isAlphabeticKeyboard
     }
 
     fun registerInputDeviceListener(listener: InputManager.InputDeviceListener, handler: Handler?)

@@ -23,6 +23,7 @@ class GamepadsCompatibleActivityTest {
         sources: Int = InputDevice.SOURCE_GAMEPAD or InputDevice.SOURCE_JOYSTICK,
         keyboardType: Int = InputDevice.KEYBOARD_TYPE_NONE,
         axisSource: Int? = InputDevice.SOURCE_JOYSTICK,
+        axis: Int = MotionEvent.AXIS_X,
     ): InputDevice {
         val device = mock(InputDevice::class.java)
         `when`(device.name).thenReturn(name)
@@ -31,6 +32,7 @@ class GamepadsCompatibleActivityTest {
         val ranges = if (axisSource == null) emptyList() else {
             val range = mock(InputDevice.MotionRange::class.java)
             `when`(range.source).thenReturn(axisSource)
+            `when`(range.axis).thenReturn(axis)
             listOf(range)
         }
         `when`(device.motionRanges).thenReturn(ranges)
@@ -47,14 +49,28 @@ class GamepadsCompatibleActivityTest {
         }
     }
 
-    @Test fun joystickWithAlphabeticKeyboardProfileIsAccepted() {
+    @Test fun alphabeticKeyboardIsRejectedEvenWithJoystickAxes() {
         for (sources in listOf(InputDevice.SOURCE_JOYSTICK,
             InputDevice.SOURCE_GAMEPAD or InputDevice.SOURCE_JOYSTICK)) {
-            assertTrue(activity.isGamepadsInputDevice(device(
+            assertFalse(activity.isGamepadsInputDevice(device(
                 sources = sources,
                 keyboardType = InputDevice.KEYBOARD_TYPE_ALPHABETIC,
             )))
         }
+    }
+
+    @Test fun vxeCompositeKeyboardWithGenericJoystickAxisIsRejected() {
+        assertFalse(activity.isGamepadsInputDevice(device(
+            name = "VXE V87 BT2 Keyboard",
+            sources = InputDevice.SOURCE_KEYBOARD or InputDevice.SOURCE_DPAD or
+                InputDevice.SOURCE_MOUSE_RELATIVE or InputDevice.SOURCE_JOYSTICK,
+            keyboardType = InputDevice.KEYBOARD_TYPE_ALPHABETIC,
+            axis = MotionEvent.AXIS_GENERIC_1,
+        )))
+    }
+
+    @Test fun ordinaryJoystickIsStillAccepted() {
+        assertTrue(activity.isGamepadsInputDevice(device()))
     }
 
     @Test fun alphabeticKeyboardClaimingGamepadSourceIsRejectedWithoutJoystickAxes() {
