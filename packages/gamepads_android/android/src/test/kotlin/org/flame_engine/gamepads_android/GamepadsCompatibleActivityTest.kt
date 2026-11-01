@@ -24,6 +24,7 @@ class GamepadsCompatibleActivityTest {
         keyboardType: Int = InputDevice.KEYBOARD_TYPE_NONE,
         axisSource: Int? = InputDevice.SOURCE_JOYSTICK,
         axis: Int = MotionEvent.AXIS_X,
+        buttons: Set<Int> = emptySet(),
     ): InputDevice {
         val device = mock(InputDevice::class.java)
         `when`(device.name).thenReturn(name)
@@ -36,6 +37,11 @@ class GamepadsCompatibleActivityTest {
             listOf(range)
         }
         `when`(device.motionRanges).thenReturn(ranges)
+        val buttonCodes = ((KeyEvent.KEYCODE_BUTTON_A..KeyEvent.KEYCODE_BUTTON_MODE) +
+            (KeyEvent.KEYCODE_BUTTON_1..KeyEvent.KEYCODE_BUTTON_16)).toIntArray()
+        `when`(device.hasKeys(*buttonCodes)).thenReturn(
+            BooleanArray(buttonCodes.size) { buttonCodes[it] in buttons }
+        )
         return device
     }
 
@@ -49,14 +55,43 @@ class GamepadsCompatibleActivityTest {
         }
     }
 
-    @Test fun alphabeticKeyboardIsRejectedEvenWithJoystickAxes() {
+    @Test fun compositeControllerWithStandardJoystickAxisIsAccepted() {
         for (sources in listOf(InputDevice.SOURCE_JOYSTICK,
             InputDevice.SOURCE_GAMEPAD or InputDevice.SOURCE_JOYSTICK)) {
-            assertFalse(activity.isGamepadsInputDevice(device(
+            assertTrue(activity.isGamepadsInputDevice(device(
                 sources = sources,
                 keyboardType = InputDevice.KEYBOARD_TYPE_ALPHABETIC,
             )))
         }
+    }
+
+    @Test fun compositeButtonOnlyControllerIsAccepted() {
+        assertTrue(activity.isGamepadsInputDevice(device(
+            sources = InputDevice.SOURCE_GAMEPAD or InputDevice.SOURCE_KEYBOARD,
+            keyboardType = InputDevice.KEYBOARD_TYPE_ALPHABETIC,
+            axisSource = null,
+            buttons = setOf(KeyEvent.KEYCODE_BUTTON_A),
+        )))
+    }
+
+    @Test fun compositeControllerWithGenericAxisAndGamepadButtonIsAccepted() {
+        assertTrue(activity.isGamepadsInputDevice(device(
+            keyboardType = InputDevice.KEYBOARD_TYPE_ALPHABETIC,
+            axis = MotionEvent.AXIS_GENERIC_1,
+            buttons = setOf(KeyEvent.KEYCODE_BUTTON_1),
+        )))
+    }
+
+    @Test fun keyboardDirectionAndMediaKeysDoNotQualifyAsGamepadControls() {
+        assertFalse(activity.isGamepadsInputDevice(device(
+            keyboardType = InputDevice.KEYBOARD_TYPE_ALPHABETIC,
+            axis = MotionEvent.AXIS_GENERIC_1,
+            buttons = setOf(KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_MEDIA_RECORD),
+        )))
+    }
+
+    @Test fun nonAlphabeticGamepadWithOnlyGenericAxisKeepsOriginalAcceptance() {
+        assertTrue(activity.isGamepadsInputDevice(device(axis = MotionEvent.AXIS_GENERIC_1)))
     }
 
     @Test fun vxeCompositeKeyboardWithGenericJoystickAxisIsRejected() {
