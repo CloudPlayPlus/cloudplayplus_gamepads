@@ -14,6 +14,10 @@ private val blockedGamepadDeviceNames = setOf(
     "Xiaomi Consumer",
 )
 
+// 与 Android KeyEvent.isGamepadButton 的按钮范围一致；方向键不能单独证明是手柄。
+internal val gamepadButtonKeyCodes = ((KeyEvent.KEYCODE_BUTTON_A..KeyEvent.KEYCODE_BUTTON_MODE) +
+    (KeyEvent.KEYCODE_BUTTON_1..KeyEvent.KEYCODE_BUTTON_16)).toIntArray()
+
 interface GamepadsCompatibleActivity {
     fun isGamepadsInputDevice(device: InputDevice): Boolean {
         if (blockedGamepadDeviceNames.contains(device.name.trim())) {
@@ -28,11 +32,15 @@ interface GamepadsCompatibleActivity {
             return false
         }
 
-        // 复合蓝牙键盘也可能声明 JOYSTICK 轴，不能据此消费它的文字按键。
-        val isAlphabeticKeyboard =
-            device.keyboardType == InputDevice.KEYBOARD_TYPE_ALPHABETIC
+        // 普通手柄（含纯按键手柄）继续走原来的判断，不增加能力门槛。
+        if (device.keyboardType != InputDevice.KEYBOARD_TYPE_ALPHABETIC) return true
 
-        return !isAlphabeticKeyboard
+        // 只对复合键盘确认实际手柄控件。VXE 等键盘的 GENERIC_1 不能作为摇杆依据。
+        val hasSupportedJoystickAxis = device.motionRanges.any { range ->
+            range.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK &&
+                EventListener.supportedAxes.any { it.axisId == range.axis }
+        }
+        return hasSupportedJoystickAxis || device.hasKeys(*gamepadButtonKeyCodes).any { it }
     }
 
     fun registerInputDeviceListener(listener: InputManager.InputDeviceListener, handler: Handler?)

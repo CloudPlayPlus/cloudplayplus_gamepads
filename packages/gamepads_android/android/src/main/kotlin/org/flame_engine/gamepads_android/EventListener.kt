@@ -15,25 +15,44 @@ data class SupportedAxis(
 class EventListener {
     companion object {
         private const val EPSILON = 0.001
+        // 枚举复合设备和转发轴事件使用同一组已支持的轴。
+        internal val supportedAxes = listOf(
+            SupportedAxis(MotionEvent.AXIS_X),
+            SupportedAxis(MotionEvent.AXIS_Y, invert = true),
+            SupportedAxis(MotionEvent.AXIS_Z),
+            SupportedAxis(MotionEvent.AXIS_RZ, invert = true),
+            SupportedAxis(MotionEvent.AXIS_HAT_X),
+            SupportedAxis(MotionEvent.AXIS_HAT_Y, invert = true),
+            SupportedAxis(MotionEvent.AXIS_LTRIGGER),
+            SupportedAxis(MotionEvent.AXIS_RTRIGGER),
+            SupportedAxis(MotionEvent.AXIS_BRAKE),
+            SupportedAxis(MotionEvent.AXIS_GAS),
+            SupportedAxis(MotionEvent.AXIS_WHEEL),
+        )
     }
     private val lastAxisValue = mutableMapOf<Int, Float>()
-    // Reference: https://developer.android.com/reference/android/view/MotionEvent
-    private val supportedAxes = listOf(
-        SupportedAxis(MotionEvent.AXIS_X),
-        SupportedAxis(MotionEvent.AXIS_Y, invert = true),
-        SupportedAxis(MotionEvent.AXIS_Z),
-        SupportedAxis(MotionEvent.AXIS_RZ, invert = true),
-        SupportedAxis(MotionEvent.AXIS_HAT_X),
-        SupportedAxis(MotionEvent.AXIS_HAT_Y, invert = true),
-        SupportedAxis(MotionEvent.AXIS_LTRIGGER),
-        SupportedAxis(MotionEvent.AXIS_RTRIGGER),
-        SupportedAxis(MotionEvent.AXIS_BRAKE),
-        SupportedAxis(MotionEvent.AXIS_GAS),
-        SupportedAxis(MotionEvent.AXIS_WHEEL),
-    )
+
+    private fun isCompositeGamepadKey(event: KeyEvent): Boolean {
+        // 一些手柄按钮仍以 KEYBOARD 来源上报，按钮键码本身足以判定。
+        if (event.keyCode in gamepadButtonKeyCodes) return true
+        val hasControllerSource =
+            event.source and InputDevice.SOURCE_GAMEPAD == InputDevice.SOURCE_GAMEPAD ||
+            event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK ||
+            event.source and InputDevice.SOURCE_DPAD == InputDevice.SOURCE_DPAD
+        if (!hasControllerSource) return false
+        return when (event.keyCode) {
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_MEDIA_RECORD -> true
+            else -> false
+        }
+    }
 
     fun onKeyEvent(keyEvent: KeyEvent, channel: MethodChannel): Boolean {
         val device = InputDevice.getDevice(keyEvent.deviceId)
+        // 只收紧复合设备；普通键盘键交回 Activity 原有的键盘路径。
+        if (device?.keyboardType == InputDevice.KEYBOARD_TYPE_ALPHABETIC &&
+            !isCompositeGamepadKey(keyEvent)) return false
         val arguments = mutableMapOf<String, Any>(
             "gamepadId" to keyEvent.deviceId.toString(),
             "time" to keyEvent.eventTime,
@@ -50,6 +69,11 @@ class EventListener {
     }
 
     fun onMotionEvent(motionEvent: MotionEvent, channel: MethodChannel): Boolean {
+        val device = InputDevice.getDevice(motionEvent.deviceId)
+        if (device?.keyboardType == InputDevice.KEYBOARD_TYPE_ALPHABETIC &&
+            motionEvent.source and InputDevice.SOURCE_JOYSTICK != InputDevice.SOURCE_JOYSTICK) {
+            return false
+        }
         var handled = false
         supportedAxes.forEach { axis ->
             val axisHandled = reportAxis(motionEvent, channel, axis)

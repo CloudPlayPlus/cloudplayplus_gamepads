@@ -1,5 +1,6 @@
 ## Unreleased
 
+- 修复同时声明字母键盘的真实手柄被过滤；仅对复合设备校验手柄控件并透传普通键盘和鼠标输入，保留普通手柄路径。
 - Add controller rumble capability queries, finite dual-motor effects, and stop support.
 
 ## 0.1.7
