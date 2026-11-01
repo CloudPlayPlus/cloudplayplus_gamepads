@@ -37,6 +37,7 @@ class AndroidMapping extends PlatformMapping {
     'AXIS_RTRIGGER': GamepadAxis.rightTrigger,
     'AXIS_BRAKE': GamepadAxis.leftTrigger,
     'AXIS_GAS': GamepadAxis.rightTrigger,
+    'AXIS_THROTTLE': GamepadAxis.rightTrigger,
   };
 
   // D-pad hat axes on Android.
