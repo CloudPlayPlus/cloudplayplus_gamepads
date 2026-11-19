@@ -32,7 +32,8 @@ namespace gamepad {
 std::optional<GamepadInfo> get_gamepad_info(const std::string& device_id) {
   std::cout << "Listening to gamepad " << device_id << std::endl;
 
-  int file_descriptor = open(device_id.c_str(), O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+  int file_descriptor =
+      open(device_id.c_str(), O_RDONLY | O_NONBLOCK | O_CLOEXEC);
   if (file_descriptor == -1) {
     std::cerr << "Could not open joystick: " << file_descriptor << std::endl;
     return std::nullopt;

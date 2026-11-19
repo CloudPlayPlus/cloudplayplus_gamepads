@@ -87,8 +87,7 @@ static void emit_gamepad_event(FlMethodChannel* channel,
         map, "key", fl_value_new_string(std::to_string(event.number).c_str()));
     fl_value_set_string(map, "value", fl_value_new_float(event.value));
     fl_value_set_string(map, "vendorId", fl_value_new_int(gamepad.vendor_id));
-    fl_value_set_string(map, "productId",
-                        fl_value_new_int(gamepad.product_id));
+    fl_value_set_string(map, "productId", fl_value_new_int(gamepad.product_id));
     fl_method_channel_invoke_method(channel, "onGamepadEvent", map, nullptr,
                                     nullptr, nullptr);
   }
@@ -183,7 +182,8 @@ static bool read_gamepad_events(GamepadWatch* watch, int fd) {
   return true;
 }
 
-static gboolean on_gamepad_ready(gint fd, GIOCondition conditions,
+static gboolean on_gamepad_ready(gint fd,
+                                 GIOCondition conditions,
                                  gpointer user_data) {
   auto* watch = static_cast<GamepadWatch*>(user_data);
   if (!(conditions & input_errors) && read_gamepad_events(watch, fd)) {
@@ -216,13 +216,14 @@ static void on_connection_event(
 
   auto watch = std::make_unique<GamepadWatch>(self, std::move(*info));
   watch->source = g_unix_fd_add(watch->info.file_descriptor, input_conditions,
-                               on_gamepad_ready, watch.get());
+                                on_gamepad_ready, watch.get());
   std::cout << "Gamepad connected " << key << " - " << watch->info.name
             << std::endl;
   self->gamepads->insert_or_assign(key, std::move(watch));
 }
 
-static gboolean on_hotplug_ready(gint fd, GIOCondition conditions,
+static gboolean on_hotplug_ready(gint fd,
+                                 GIOCondition conditions,
                                  gpointer user_data) {
   auto* self = GAMEPADS_LINUX_PLUGIN(user_data);
   if (!(conditions & input_errors) &&
@@ -280,11 +281,10 @@ void gamepads_linux_plugin_register_with_registrar(
   // Keep hotplug, input, and method calls on the same GTK main loop.
   plugin->hotplug_fd = connection_listener::open_watch();
   if (plugin->hotplug_fd != -1) {
-    plugin->hotplug_source = g_unix_fd_add(
-        plugin->hotplug_fd, input_conditions, on_hotplug_ready, plugin);
+    plugin->hotplug_source = g_unix_fd_add(plugin->hotplug_fd, input_conditions,
+                                           on_hotplug_ready, plugin);
   }
-  connection_listener::list_existing([plugin](const auto& event) {
-    on_connection_event(plugin, event);
-  });
+  connection_listener::list_existing(
+      [plugin](const auto& event) { on_connection_event(plugin, event); });
   g_object_unref(plugin);
 }

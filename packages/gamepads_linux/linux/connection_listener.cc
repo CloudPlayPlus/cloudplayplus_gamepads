@@ -37,8 +37,8 @@ void list_existing(const EventConsumer& event_consumer) {
 
   while (const auto* entry = readdir(dir)) {
     if (entry->d_type == DT_CHR && starts_with(entry->d_name, "js")) {
-      event_consumer({ConnectionEventType::CONNECTED,
-                      input_dir + entry->d_name});
+      event_consumer(
+          {ConnectionEventType::CONNECTED, input_dir + entry->d_name});
     }
   }
   closedir(dir);
@@ -66,11 +66,10 @@ bool read_events(int fd, const EventConsumer& event_consumer) {
     }
 
     if (event->mask & IN_DELETE) {
-      event_consumer({ConnectionEventType::DISCONNECTED,
-                      input_dir + event->name});
+      event_consumer(
+          {ConnectionEventType::DISCONNECTED, input_dir + event->name});
     } else if (event->mask & (IN_CREATE | IN_ATTRIB)) {
-      event_consumer({ConnectionEventType::CONNECTED,
-                      input_dir + event->name});
+      event_consumer({ConnectionEventType::CONNECTED, input_dir + event->name});
     }
   }
   return true;
