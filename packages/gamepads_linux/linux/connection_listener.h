@@ -1,11 +1,7 @@
-#include <sys/inotify.h>
-#include <unistd.h>
-#include <functional>
-#include <iostream>
-#include <optional>
-#include <string>
+#pragma once
 
-#include "utils.h"
+#include <functional>
+#include <string>
 
 namespace connection_listener {
 enum class ConnectionEventType {
@@ -18,6 +14,9 @@ struct ConnectionEvent {
   std::string device_id;
 };
 
-void listen(const bool* keep_reading,
-            const std::function<void(const ConnectionEvent&)>& event_consumer);
+using EventConsumer = std::function<void(const ConnectionEvent&)>;
+
+int open_watch();
+void list_existing(const EventConsumer& event_consumer);
+bool read_events(int fd, const EventConsumer& event_consumer);
 }  // namespace connection_listener
