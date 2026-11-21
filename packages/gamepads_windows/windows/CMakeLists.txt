@@ -73,10 +73,9 @@ target_include_directories(${PLUGIN_NAME} PRIVATE
   "${microsoft_gameinput_SOURCE_DIR}/native/include/v0")
 target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin "${gameinput_lib}")
 
-# List of absolute paths to libraries that should be bundled with the plugin.
-# This list could contain prebuilt libraries, or libraries created by an
-# external build triggered from this build file.
+# Flutter copies these files into the Windows bundle, including the license
+# for the Microsoft loader linked into the plugin.
 set(gamepads_windows_bundled_libraries
-  ""
+  "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE-Microsoft.GameInput.txt"
   PARENT_SCOPE
 )
