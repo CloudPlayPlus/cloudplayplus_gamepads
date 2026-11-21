@@ -77,9 +77,10 @@ struct TestInput {
 };
 
 static TestInput input;
+static bool gameinput_available = true;
 static HRESULT TestCreate(TestInput** result) {
-  *result = &input;
-  return S_OK;
+  *result = gameinput_available ? &input : nullptr;
+  return gameinput_available ? S_OK : HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND);
 }
 
 #define IGameInputDevice TestDevice
@@ -94,6 +95,13 @@ int main() {
   input.device.info.supportedRumbleMotors =
       GameInputRumbleLowFrequency | GameInputRumbleHighFrequency;
   const std::string id(APP_LOCAL_DEVICE_ID_SIZE * 2, '0');
+  gameinput_available = false;
+  {
+    GamepadRumble rumble;
+    if (rumble.Has(id) || rumble.Set(id, 0.5, 0.5, 50))
+      return 10;
+  }
+  gameinput_available = true;
   {
     GamepadRumble rumble;
     if (!rumble.Has(id) || !rumble.Set(id, 0.5, 0.5, 50))

@@ -12,12 +12,33 @@ project(${PROJECT_NAME} LANGUAGES CXX)
 # not be changed
 set(PLUGIN_NAME "gamepads_windows_plugin")
 
+# Use the NuGet loader rather than the Windows SDK import library. Pin the
+# headers and loader together so both use the same GameInput API definitions.
+include(FetchContent)
+if(POLICY CMP0135)
+  cmake_policy(SET CMP0135 NEW)
+endif()
+FetchContent_Declare(microsoft_gameinput
+  URL https://api.nuget.org/v3-flatcontainer/microsoft.gameinput/4.1.314/microsoft.gameinput.4.1.314.nupkg
+  URL_HASH SHA256=3c5d5700a210de289e9f02e2a1cb98848f32b981a5c22f7687a692f762a6cd26
+  TLS_VERIFY TRUE
+  TIMEOUT 60
+)
+FetchContent_MakeAvailable(microsoft_gameinput)
+string(TOLOWER "${CMAKE_CXX_COMPILER_ARCHITECTURE_ID}" gameinput_arch)
+set(gameinput_lib
+  "${microsoft_gameinput_SOURCE_DIR}/native/lib/${gameinput_arch}/GameInput.lib")
+if(NOT EXISTS "${gameinput_lib}")
+  message(FATAL_ERROR "No GameInput loader for ${CMAKE_CXX_COMPILER_ARCHITECTURE_ID}")
+endif()
+
 # Any new source files that you add to the plugin should be added here.
 list(APPEND PLUGIN_SOURCES
   "gamepads_windows_plugin.cpp"
   "gamepads_windows_plugin.h"
   "gamepad.cpp"
   "gamepad.h"
+  "gameinput_loader.cpp"
   "gameinput_release.h"
   "utils.cpp"
   "utils.h"
@@ -48,7 +69,9 @@ target_compile_definitions(${PLUGIN_NAME} PRIVATE FLUTTER_PLUGIN_IMPL)
 # dependencies here.
 target_include_directories(${PLUGIN_NAME} INTERFACE
   "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin)
+target_include_directories(${PLUGIN_NAME} PRIVATE
+  "${microsoft_gameinput_SOURCE_DIR}/native/include/v0")
+target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin "${gameinput_lib}")
 
 # List of absolute paths to libraries that should be bundled with the plugin.
 # This list could contain prebuilt libraries, or libraries created by an

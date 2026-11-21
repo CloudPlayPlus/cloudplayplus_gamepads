@@ -68,9 +68,10 @@ struct TestInput {
     SetEvent(released);
   }
 } input;
+static bool gameinput_available = true;
 static HRESULT TestCreate(TestInput** result) {
-  *result = &input;
-  return S_OK;
+  *result = gameinput_available ? &input : nullptr;
+  return gameinput_available ? S_OK : HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND);
 }
 #define IGameInput TestInput
 #define IGameInputDevice TestDevice
@@ -84,6 +85,13 @@ static HRESULT TestCreate(TestInput** result) {
 
 int main() {
   Gamepads pads;
+  gameinput_available = false;
+  pads.init();
+  if (!pads.get_gamepads().empty() || reads != 0)
+    return 10;
+  pads.stop();
+
+  gameinput_available = true;
   pads.init();
   if (WaitForSingleObject(reading_entered, 2000) != WAIT_OBJECT_0)
     return 1;

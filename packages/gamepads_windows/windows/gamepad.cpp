@@ -10,7 +10,6 @@
 #include <GameInput.h>
 #include <iomanip>
 #include <sstream>
-#pragma comment(lib, "GameInput.lib")
 
 Gamepads gamepads;
 
