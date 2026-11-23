@@ -85,6 +85,11 @@ void GamepadsWindowsPlugin::HandleMethodCall(
     result->Success(flutter::EncodableValue(accepted));
     return;
   }
+  if (method == "runtimeStatus") {
+    // 插件注册时已初始化手柄，此时报告的是实际使用的运行库。
+    result->Success(flutter::EncodableValue(GameInputRuntimeSource()));
+    return;
+  }
   if (method_call.method_name().compare("listGamepads") == 0) {
     flutter::EncodableList list;
     for (auto gamepad : gamepads.get_gamepads()) {

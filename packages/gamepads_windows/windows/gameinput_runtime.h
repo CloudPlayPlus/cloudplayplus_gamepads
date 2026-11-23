@@ -5,6 +5,7 @@
 #include <windows.h>
 #include <GameInput.h>
 
+#include <atomic>
 #include <string>
 
 // 插件不链接 GameInput.lib：缺少运行库时宿主进程仍可启动。
@@ -48,10 +49,12 @@ inline std::wstring BundledRuntimePath() {
   return path + L"GameInputRedist.dll";
 }
 
-inline CreateFn ResolveCreate() {
-  if (const auto inbox = LoadCreate(LoadLibraryExW(
-          L"GameInput.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32)))
-    return inbox;
+inline CreateFn LoadInbox() {
+  return LoadCreate(
+      LoadLibraryExW(L"GameInput.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32));
+}
+
+inline CreateFn LoadBundled() {
   const auto bundled = BundledRuntimePath();
   if (bundled.empty())
     return nullptr;
@@ -60,12 +63,74 @@ inline CreateFn ResolveCreate() {
       bundled.c_str(), nullptr,
       LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32));
 }
+
+enum class Source : int { none = 0, inbox = 1, bundled = 2 };
+
+// 先用系统运行库；系统 DLL 不存在或创建失败时改用附带运行库。
+// Windows 10 2004 至 Windows 11 23H2 自带的 GameInput.dll 只是校验签名后加载
+// 外部运行库的壳，系统未安装该运行库时创建会失败。
+// 附带运行库仅在需要时加载，系统运行库可用的机器不加载它。
+template <typename Input, typename Inbox, typename Bundled>
+HRESULT CreateWithFallback(Input** input,
+                           Inbox inbox,
+                           Bundled bundled,
+                           Source* source) {
+  *input = nullptr;
+  *source = Source::none;
+  HRESULT hr = HRESULT_FROM_WIN32(ERROR_MOD_NOT_FOUND);
+  const auto attempt = [&](auto create, Source from) {
+    if (!create)
+      return false;
+    hr = create(input);
+    if (SUCCEEDED(hr) && *input) {
+      *source = from;
+      return true;
+    }
+    if (*input) {
+      (*input)->Release();
+      *input = nullptr;
+    }
+    if (SUCCEEDED(hr))
+      hr = E_POINTER;
+    return false;
+  };
+  if (!attempt(inbox(), Source::inbox))
+    attempt(bundled(), Source::bundled);
+  return hr;
+}
+
+inline std::atomic<int> current_source{static_cast<int>(Source::none)};
 }  // namespace gamepads_windows_gameinput
 
 inline HRESULT CreateGameInput(IGameInput** input) {
-  *input = nullptr;
-  static const auto create = gamepads_windows_gameinput::ResolveCreate();
-  return create ? create(input) : HRESULT_FROM_WIN32(ERROR_MOD_NOT_FOUND);
+  namespace runtime = gamepads_windows_gameinput;
+  runtime::Source source;
+  const HRESULT hr = runtime::CreateWithFallback(
+      input,
+      [] {
+        static const auto create = runtime::LoadInbox();
+        return create;
+      },
+      [] {
+        static const auto create = runtime::LoadBundled();
+        return create;
+      },
+      &source);
+  runtime::current_source.store(static_cast<int>(source));
+  return hr;
+}
+
+// 最近一次创建使用的运行库："system"、"bundled" 或 "unavailable"。
+inline const char* GameInputRuntimeSource() {
+  switch (static_cast<gamepads_windows_gameinput::Source>(
+      gamepads_windows_gameinput::current_source.load())) {
+    case gamepads_windows_gameinput::Source::inbox:
+      return "system";
+    case gamepads_windows_gameinput::Source::bundled:
+      return "bundled";
+    default:
+      return "unavailable";
+  }
 }
 
 #endif  // GAMEPADS_WINDOWS_GAMEINPUT_RUNTIME_H_
