@@ -6,6 +6,7 @@
 
 #include "gamepad.h"
 #include "gameinput_release.h"
+#include "gameinput_runtime.h"
 #include "utils.h"
 #include <GameInput.h>
 #include <iomanip>
@@ -114,7 +115,8 @@ bool are_states_different(const GameInputGamepadState& a,
 
 void Gamepads::init() {
   stopping_ = false;
-  if (FAILED(GameInputCreate(&input_)) || !input_)
+  if (!GameInputRuntimeAvailable() || FAILED(GameInputCreate(&input_)) ||
+      !input_)
     return;
   const auto hr = input_->RegisterDeviceCallback(
       nullptr, GameInputKindGamepad, GameInputDeviceConnected,

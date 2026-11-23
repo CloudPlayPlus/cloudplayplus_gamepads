@@ -19,6 +19,7 @@ list(APPEND PLUGIN_SOURCES
   "gamepad.cpp"
   "gamepad.h"
   "gameinput_release.h"
+  "gameinput_runtime.h"
   "utils.cpp"
   "utils.h"
 )
@@ -48,7 +49,11 @@ target_compile_definitions(${PLUGIN_NAME} PRIVATE FLUTTER_PLUGIN_IMPL)
 # dependencies here.
 target_include_directories(${PLUGIN_NAME} INTERFACE
   "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin)
+target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin
+  delayimp)
+# Windows Server、LTSC 及旧版 Windows 10 可能没有 GameInput.dll。延迟加载使
+# 宿主进程不因缺少手柄运行库而无法启动；调用前由 GameInputRuntimeAvailable() 守卫。
+target_link_options(${PLUGIN_NAME} PRIVATE "/DELAYLOAD:GameInput.dll")
 
 # List of absolute paths to libraries that should be bundled with the plugin.
 # This list could contain prebuilt libraries, or libraries created by an

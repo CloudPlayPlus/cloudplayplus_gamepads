@@ -74,6 +74,20 @@ jobs:
       - name: Compile platform implementation
         working-directory: packages/gamepads/example
         run: flutter build ${{ matrix.command }}
+      - name: Require delay-loaded GameInput
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        # 缺少 GameInput.dll 的系统上，普通导入会让宿主应用无法启动。
+        run: |
+          $dll = Get-ChildItem packages/gamepads/example/build/windows -Recurse -Filter gamepads_windows_plugin.dll | Select-Object -First 1
+          if (-not $dll) { throw 'gamepads_windows_plugin.dll not found' }
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+          $dumpbin = Get-ChildItem "$vs\VC\Tools\MSVC" -Recurse -Filter dumpbin.exe | Where-Object FullName -like '*Hostx64\x64\*' | Select-Object -First 1
+          $out = (& $dumpbin.FullName /nologo /dependents $dll.FullName) -join "`n"
+          $parts = $out -split 'delay load dependencies'
+          if ($parts.Count -ne 2) { throw "No delay-load section:`n$out" }
+          if ($parts[0] -match '(?im)^\s*GameInput\.dll\s*$') { throw "GameInput.dll is a static import:`n$out" }
+          if ($parts[1] -notmatch '(?im)^\s*GameInput\.dll\s*$') { throw "GameInput.dll is not delay-loaded:`n$out" }
       - name: Configure Windows rumble regression
         if: matrix.platform == 'windows'
         run: cmake -S packages/gamepads_windows/windows/test -B build/rumble-test

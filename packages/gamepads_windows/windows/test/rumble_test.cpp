@@ -77,11 +77,19 @@ struct TestInput {
 };
 
 static TestInput input;
+static unsigned creates = 0;
 static HRESULT TestCreate(TestInput** result) {
+  ++creates;
   *result = &input;
   return S_OK;
 }
 
+// 替代系统运行库探测，CI 主机是否自带 GameInput.dll 不影响回归。
+#define GAMEPADS_WINDOWS_GAMEINPUT_RUNTIME_H_
+static bool runtime_available = false;
+inline bool GameInputRuntimeAvailable() {
+  return runtime_available;
+}
 #define IGameInputDevice TestDevice
 #define IGameInput TestInput
 #define GameInputCreate TestCreate
@@ -94,6 +102,13 @@ int main() {
   input.device.info.supportedRumbleMotors =
       GameInputRumbleLowFrequency | GameInputRumbleHighFrequency;
   const std::string id(APP_LOCAL_DEVICE_ID_SIZE * 2, '0');
+  {
+    // 缺少运行库：不得调用 GameInputCreate，请求被拒绝，析构安全。
+    GamepadRumble rumble;
+    if (creates != 0 || rumble.Has(id) || rumble.Set(id, 0.5, 0.5, 50))
+      return 13;
+  }
+  runtime_available = true;
   {
     GamepadRumble rumble;
     if (!rumble.Has(id) || !rumble.Set(id, 0.5, 0.5, 50))

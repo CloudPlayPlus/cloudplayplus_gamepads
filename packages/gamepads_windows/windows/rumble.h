@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <GameInput.h>
 #include "gameinput_release.h"
+#include "gameinput_runtime.h"
 #include <chrono>
 #include <condition_variable>
 #include <iomanip>
@@ -16,7 +17,8 @@
 class GamepadRumble {
  public:
   GamepadRumble() {
-    if (FAILED(GameInputCreate(&input_)) || !input_)
+    if (!GameInputRuntimeAvailable() || FAILED(GameInputCreate(&input_)) ||
+        !input_)
       return;
     const auto hr = input_->RegisterDeviceCallback(
         nullptr, GameInputKindGamepad, GameInputDeviceConnected,
