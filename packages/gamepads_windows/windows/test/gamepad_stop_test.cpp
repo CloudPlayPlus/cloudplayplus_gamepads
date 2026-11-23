@@ -77,22 +77,22 @@ static HRESULT TestCreate(TestInput** result) {
 // 替代系统运行库探测，CI 主机是否自带 GameInput.dll 不影响回归。
 #define GAMEPADS_WINDOWS_GAMEINPUT_RUNTIME_H_
 static bool runtime_available = false;
-inline bool GameInputRuntimeAvailable() {
-  return runtime_available;
+static HRESULT CreateGameInput(TestInput** result) {
+  if (!runtime_available)
+    return HRESULT_FROM_WIN32(ERROR_MOD_NOT_FOUND);
+  return TestCreate(result);
 }
 #define IGameInput TestInput
 #define IGameInputDevice TestDevice
 #define IGameInputReading TestReading
-#define GameInputCreate TestCreate
 #include "../gamepad.cpp"
-#undef GameInputCreate
 #undef IGameInputReading
 #undef IGameInputDevice
 #undef IGameInput
 
 int main() {
   Gamepads pads;
-  // 缺少运行库：不得调用 GameInputCreate，停止仍安全且可重复。
+  // 缺少运行库：不得创建输入对象，停止仍安全且可重复。
   pads.init();
   if (creates != 0 || !pads.get_gamepads().empty())
     return 10;

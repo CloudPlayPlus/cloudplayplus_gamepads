@@ -49,16 +49,56 @@ target_compile_definitions(${PLUGIN_NAME} PRIVATE FLUTTER_PLUGIN_IMPL)
 # dependencies here.
 target_include_directories(${PLUGIN_NAME} INTERFACE
   "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin
-  delayimp)
-# Windows Server、LTSC 及旧版 Windows 10 可能没有 GameInput.dll。延迟加载使
-# 宿主进程不因缺少手柄运行库而无法启动；调用前由 GameInputRuntimeAvailable() 守卫。
-target_link_options(${PLUGIN_NAME} PRIVATE "/DELAYLOAD:GameInput.dll")
+target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin)
+
+# 不链接 GameInput.lib：运行时按序号解析系统 GameInput.dll，缺失时回退到随应用
+# 分发的 GameInputRedist.dll（见 gameinput_runtime.h）。后者取自固定版本、固定哈希的
+# Microsoft.GameInput NuGet 包；包与 DLL 哈希均校验，任一不符即配置失败。
+set(GAMEINPUT_VERSION "4.1.314")
+set(GAMEINPUT_NUPKG_SHA256
+  "3c5d5700a210de289e9f02e2a1cb98848f32b981a5c22f7687a692f762a6cd26")
+if(CMAKE_GENERATOR_PLATFORM STREQUAL "ARM64" OR
+   CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|arm64|aarch64)$")
+  set(GAMEINPUT_ARCH "arm64")
+  set(GAMEINPUT_DLL_SHA256
+    "9021ce3bc0f6c61ce7800f6940d82cfb826d27008f7710a894c69ac97085a8c4")
+else()
+  set(GAMEINPUT_ARCH "x64")
+  set(GAMEINPUT_DLL_SHA256
+    "15fcfb28879dd0bead760652405c82d39e5d6bc784ed9345621ae1fed0dc35b4")
+endif()
+set(GAMEINPUT_CACHE "${CMAKE_BINARY_DIR}/gameinput-${GAMEINPUT_VERSION}")
+set(GAMEINPUT_NUPKG "${GAMEINPUT_CACHE}/microsoft.gameinput.${GAMEINPUT_VERSION}.nupkg")
+set(GAMEINPUT_REDIST "${GAMEINPUT_CACHE}/${GAMEINPUT_ARCH}/GameInputRedist.dll")
+if(NOT EXISTS "${GAMEINPUT_REDIST}")
+  file(DOWNLOAD
+    "https://api.nuget.org/v3-flatcontainer/microsoft.gameinput/${GAMEINPUT_VERSION}/microsoft.gameinput.${GAMEINPUT_VERSION}.nupkg"
+    "${GAMEINPUT_NUPKG}"
+    EXPECTED_HASH SHA256=${GAMEINPUT_NUPKG_SHA256}
+    TLS_VERIFY ON
+    STATUS GAMEINPUT_DOWNLOAD)
+  list(GET GAMEINPUT_DOWNLOAD 0 GAMEINPUT_DOWNLOAD_CODE)
+  if(NOT GAMEINPUT_DOWNLOAD_CODE EQUAL 0)
+    message(FATAL_ERROR "Microsoft.GameInput ${GAMEINPUT_VERSION} download failed: ${GAMEINPUT_DOWNLOAD}")
+  endif()
+  set(GAMEINPUT_EXTRACT "${GAMEINPUT_CACHE}/extract")
+  file(REMOVE_RECURSE "${GAMEINPUT_EXTRACT}")
+  file(ARCHIVE_EXTRACT INPUT "${GAMEINPUT_NUPKG}" DESTINATION "${GAMEINPUT_EXTRACT}"
+    PATTERNS "native/bin/${GAMEINPUT_ARCH}/GameInputRedist.dll")
+  file(COPY "${GAMEINPUT_EXTRACT}/native/bin/${GAMEINPUT_ARCH}/GameInputRedist.dll"
+    DESTINATION "${GAMEINPUT_CACHE}/${GAMEINPUT_ARCH}")
+  file(REMOVE_RECURSE "${GAMEINPUT_EXTRACT}")
+endif()
+file(SHA256 "${GAMEINPUT_REDIST}" GAMEINPUT_ACTUAL_SHA256)
+if(NOT GAMEINPUT_ACTUAL_SHA256 STREQUAL GAMEINPUT_DLL_SHA256)
+  file(REMOVE "${GAMEINPUT_REDIST}")
+  message(FATAL_ERROR "GameInputRedist.dll hash mismatch: ${GAMEINPUT_ACTUAL_SHA256}")
+endif()
 
 # List of absolute paths to libraries that should be bundled with the plugin.
 # This list could contain prebuilt libraries, or libraries created by an
 # external build triggered from this build file.
 set(gamepads_windows_bundled_libraries
-  ""
+  "${GAMEINPUT_REDIST}"
   PARENT_SCOPE
 )

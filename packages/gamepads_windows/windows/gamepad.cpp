@@ -11,7 +11,6 @@
 #include <GameInput.h>
 #include <iomanip>
 #include <sstream>
-#pragma comment(lib, "GameInput.lib")
 
 Gamepads gamepads;
 
@@ -115,8 +114,7 @@ bool are_states_different(const GameInputGamepadState& a,
 
 void Gamepads::init() {
   stopping_ = false;
-  if (!GameInputRuntimeAvailable() || FAILED(GameInputCreate(&input_)) ||
-      !input_)
+  if (FAILED(CreateGameInput(&input_)) || !input_)
     return;
   const auto hr = input_->RegisterDeviceCallback(
       nullptr, GameInputKindGamepad, GameInputDeviceConnected,

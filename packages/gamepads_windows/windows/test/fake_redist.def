@@ -1,0 +1,3 @@
+LIBRARY GameInputRedist
+EXPORTS
+  GameInputCreate=FakeGameInputCreate @1

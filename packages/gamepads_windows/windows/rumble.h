@@ -17,8 +17,7 @@
 class GamepadRumble {
  public:
   GamepadRumble() {
-    if (!GameInputRuntimeAvailable() || FAILED(GameInputCreate(&input_)) ||
-        !input_)
+    if (FAILED(CreateGameInput(&input_)) || !input_)
       return;
     const auto hr = input_->RegisterDeviceCallback(
         nullptr, GameInputKindGamepad, GameInputDeviceConnected,

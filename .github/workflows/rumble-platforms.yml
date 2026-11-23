@@ -74,20 +74,22 @@ jobs:
       - name: Compile platform implementation
         working-directory: packages/gamepads/example
         run: flutter build ${{ matrix.command }}
-      - name: Require delay-loaded GameInput
+      - name: Require runtime-resolved GameInput
         if: matrix.platform == 'windows'
         shell: pwsh
-        # 缺少 GameInput.dll 的系统上，普通导入会让宿主应用无法启动。
+        # 缺少 GameInput.dll 的系统上，任何导入都会让宿主应用无法启动；
+        # 回退运行库须随应用一同输出到可执行文件目录。
         run: |
-          $dll = Get-ChildItem packages/gamepads/example/build/windows -Recurse -Filter gamepads_windows_plugin.dll | Select-Object -First 1
-          if (-not $dll) { throw 'gamepads_windows_plugin.dll not found' }
+          $dll = Get-ChildItem packages/gamepads/example/build/windows -Recurse -Filter gamepads_windows_plugin.dll | Where-Object FullName -like '*\runner\*' | Select-Object -First 1
+          if (-not $dll) { throw 'gamepads_windows_plugin.dll not found in runner output' }
           $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
           $dumpbin = Get-ChildItem "$vs\VC\Tools\MSVC" -Recurse -Filter dumpbin.exe | Where-Object FullName -like '*Hostx64\x64\*' | Select-Object -First 1
           $out = (& $dumpbin.FullName /nologo /dependents $dll.FullName) -join "`n"
-          $parts = $out -split 'delay load dependencies'
-          if ($parts.Count -ne 2) { throw "No delay-load section:`n$out" }
-          if ($parts[0] -match '(?im)^\s*GameInput\.dll\s*$') { throw "GameInput.dll is a static import:`n$out" }
-          if ($parts[1] -notmatch '(?im)^\s*GameInput\.dll\s*$') { throw "GameInput.dll is not delay-loaded:`n$out" }
+          if ($out -match '(?im)^\s*GameInput(Redist)?\.dll\s*$') { throw "GameInput must not be imported:`n$out" }
+          $redist = Join-Path $dll.DirectoryName 'GameInputRedist.dll'
+          if (-not (Test-Path $redist)) { throw 'GameInputRedist.dll is not bundled next to the executable' }
+          $hash = (Get-FileHash $redist -Algorithm SHA256).Hash
+          if ($hash -ne '15FCFB28879DD0BEAD760652405C82D39E5D6BC784ED9345621AE1FED0DC35B4') { throw "Unexpected GameInputRedist.dll: $hash" }
       - name: Configure Windows rumble regression
         if: matrix.platform == 'windows'
         run: cmake -S packages/gamepads_windows/windows/test -B build/rumble-test
