@@ -12,6 +12,8 @@
 // 保持绝大多数机器的既有行为。
 // 来源二：随应用分发、位于可执行文件目录的 GameInputRedist.dll。
 // 两者都以序号 1 导出 v0 GameInputCreate。
+// 附带运行库仅覆盖 Microsoft 支持的 Windows 10 1903 及以上；更早系统（如
+// Server 2016/2019）加载失败时与缺失同样处理：手柄不可用，宿主照常运行。
 // 模块保持加载直至进程退出，与异步释放的 IGameInput 生命周期一致。
 namespace gamepads_windows_gameinput {
 using CreateFn = HRESULT(WINAPI*)(IGameInput**);
