@@ -9,8 +9,8 @@
 // 否则延迟加载失败会抛出结构化异常。模块保持加载，延迟加载复用同一实例。
 inline bool GameInputRuntimeAvailable() {
   static const bool available = [] {
-    const HMODULE module = LoadLibraryExW(L"GameInput.dll", nullptr,
-                                          LOAD_LIBRARY_SEARCH_SYSTEM32);
+    const HMODULE module =
+        LoadLibraryExW(L"GameInput.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
     if (!module)
       return false;
     // v0 GameInput.dll 仅按序号 1 导出 GameInputCreate。
