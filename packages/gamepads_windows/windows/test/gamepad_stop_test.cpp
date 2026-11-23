@@ -68,9 +68,17 @@ struct TestInput {
     SetEvent(released);
   }
 } input;
+static std::atomic<int> creates{0};
 static HRESULT TestCreate(TestInput** result) {
+  ++creates;
   *result = &input;
   return S_OK;
+}
+// 替代系统运行库探测，CI 主机是否自带 GameInput.dll 不影响回归。
+#define GAMEPADS_WINDOWS_GAMEINPUT_RUNTIME_H_
+static bool runtime_available = false;
+inline bool GameInputRuntimeAvailable() {
+  return runtime_available;
 }
 #define IGameInput TestInput
 #define IGameInputDevice TestDevice
@@ -84,6 +92,16 @@ static HRESULT TestCreate(TestInput** result) {
 
 int main() {
   Gamepads pads;
+  // 缺少运行库：不得调用 GameInputCreate，停止仍安全且可重复。
+  pads.init();
+  if (creates != 0 || !pads.get_gamepads().empty())
+    return 10;
+  pads.stop();
+  pads.stop();
+  if (input_releases != 0)
+    return 11;
+
+  runtime_available = true;
   pads.init();
   if (WaitForSingleObject(reading_entered, 2000) != WAIT_OBJECT_0)
     return 1;
