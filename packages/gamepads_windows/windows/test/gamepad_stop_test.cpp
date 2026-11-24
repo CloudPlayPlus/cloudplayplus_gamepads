@@ -82,6 +82,9 @@ static HRESULT CreateGameInput(TestInput** result) {
     return HRESULT_FROM_WIN32(ERROR_MOD_NOT_FOUND);
   return TestCreate(result);
 }
+static bool GamepadInputFocused() {
+  return true;
+}
 #define IGameInput TestInput
 #define IGameInputDevice TestDevice
 #define IGameInputReading TestReading
@@ -90,7 +93,35 @@ static HRESULT CreateGameInput(TestInput** result) {
 #undef IGameInputDevice
 #undef IGameInput
 
+// 失焦只发一次松开，之后不转发；回到前台从中立状态补齐仍按下的键。
+static int CheckFocusGate() {
+  GameInputGamepadState previous{};
+  GameInputGamepadState pressed{};
+  pressed.buttons = GameInputGamepadA;
+  pressed.leftTrigger = 0.5f;
+  if (next_events(previous, pressed, true).size() != 2)
+    return 20;
+  const auto released = next_events(previous, pressed, false);
+  if (released.size() != 2)
+    return 21;
+  for (const auto& event : released) {
+    if (event.value != 0.0)
+      return 22;
+  }
+  GameInputGamepadState other = pressed;
+  other.buttons |= GameInputGamepadB;
+  if (!next_events(previous, other, false).empty())
+    return 23;
+  if (next_events(previous, other, true).size() != 3)
+    return 24;
+  if (!next_events(previous, other, true).empty())
+    return 25;
+  return 0;
+}
+
 int main() {
+  if (const int failed = CheckFocusGate())
+    return failed;
   Gamepads pads;
   // 缺少运行库：不得创建输入对象，停止仍安全且可重复。
   pads.init();

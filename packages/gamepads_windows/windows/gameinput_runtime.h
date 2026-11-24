@@ -133,4 +133,17 @@ inline const char* GameInputRuntimeSource() {
   }
 }
 
+// 系统运行库由 GameInput 服务按前台窗口过滤输入；附带运行库没有该服务，部分
+// 设备在应用失焦后仍上报，因此仅在使用附带运行库时检查本进程是否拥有前台窗口。
+inline bool GamepadInputFocused() {
+  if (gamepads_windows_gameinput::current_source.load() !=
+      static_cast<int>(gamepads_windows_gameinput::Source::bundled))
+    return true;
+  const HWND window = GetForegroundWindow();
+  DWORD process = 0;
+  if (window)
+    GetWindowThreadProcessId(window, &process);
+  return process == GetCurrentProcessId();
+}
+
 #endif  // GAMEPADS_WINDOWS_GAMEINPUT_RUNTIME_H_
