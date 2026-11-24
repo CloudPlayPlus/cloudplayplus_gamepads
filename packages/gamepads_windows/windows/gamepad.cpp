@@ -128,7 +128,10 @@ std::list<Event> next_events(GameInputGamepadState& previous,
 
 void Gamepads::init() {
   stopping_ = false;
-  if (FAILED(CreateGameInput(&input_)) || !input_)
+  int source = 0;
+  const HRESULT created = CreateGameInput(&input_, &source);
+  runtime_source_ = source;
+  if (FAILED(created) || !input_)
     return;
   const auto hr = input_->RegisterDeviceCallback(
       nullptr, GameInputKindGamepad, GameInputDeviceConnected,
@@ -236,8 +239,8 @@ void Gamepads::read_gamepad(Reader* reader) {
     input_->GetCurrentReading(GameInputKindGamepad, reader->device, &reading);
     if (reading) {
       if (reading->GetGamepadState(&state) && !reader->stopping) {
-        for (const auto& event :
-             next_events(previous_state, state, GamepadInputFocused())) {
+        for (const auto& event : next_events(
+                 previous_state, state, GamepadInputFocused(runtime_source_))) {
           if (event_emitter)
             (*event_emitter)(&reader->data, event);
         }

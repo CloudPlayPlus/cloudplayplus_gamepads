@@ -77,12 +77,14 @@ static HRESULT TestCreate(TestInput** result) {
 // 替代系统运行库探测，CI 主机是否自带 GameInput.dll 不影响回归。
 #define GAMEPADS_WINDOWS_GAMEINPUT_RUNTIME_H_
 static bool runtime_available = false;
-static HRESULT CreateGameInput(TestInput** result) {
+static HRESULT CreateGameInput(TestInput** result, int* source = nullptr) {
+  if (source)
+    *source = runtime_available ? 2 : 0;  // 模拟附带运行库与不可用。
   if (!runtime_available)
     return HRESULT_FROM_WIN32(ERROR_MOD_NOT_FOUND);
   return TestCreate(result);
 }
-static bool GamepadInputFocused() {
+static bool GamepadInputFocused(int) {
   return true;
 }
 #define IGameInput TestInput
@@ -125,7 +127,8 @@ int main() {
   Gamepads pads;
   // 缺少运行库：不得创建输入对象，停止仍安全且可重复。
   pads.init();
-  if (creates != 0 || !pads.get_gamepads().empty())
+  if (creates != 0 || !pads.get_gamepads().empty() ||
+      pads.runtime_source() != 0)
     return 10;
   pads.stop();
   pads.stop();
@@ -137,7 +140,8 @@ int main() {
   if (WaitForSingleObject(reading_entered, 2000) != WAIT_OBJECT_0)
     return 1;
   const auto snapshot = pads.get_gamepads();
-  if (snapshot.size() != 1 || input.device.refs != 1)
+  if (snapshot.size() != 1 || input.device.refs != 1 ||
+      pads.runtime_source() != 2)
     return 2;
   std::atomic<bool> stopped{false};
   std::thread stop([&] {

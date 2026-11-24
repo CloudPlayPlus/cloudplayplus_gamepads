@@ -98,13 +98,13 @@ HRESULT CreateWithFallback(Input** input,
     attempt(bundled(), Source::bundled);
   return hr;
 }
-
-inline std::atomic<int> current_source{static_cast<int>(Source::none)};
 }  // namespace gamepads_windows_gameinput
 
-inline HRESULT CreateGameInput(IGameInput** input) {
+// source 可选：返回本次实际使用的运行库（Source
+// 的整数值）。来源由调用方各自保存， 震动模块的创建不会改变手柄读取所用的来源。
+inline HRESULT CreateGameInput(IGameInput** input, int* source = nullptr) {
   namespace runtime = gamepads_windows_gameinput;
-  runtime::Source source;
+  runtime::Source used;
   const HRESULT hr = runtime::CreateWithFallback(
       input,
       [] {
@@ -115,15 +115,15 @@ inline HRESULT CreateGameInput(IGameInput** input) {
         static const auto create = runtime::LoadBundled();
         return create;
       },
-      &source);
-  runtime::current_source.store(static_cast<int>(source));
+      &used);
+  if (source)
+    *source = static_cast<int>(used);
   return hr;
 }
 
-// 最近一次创建使用的运行库："system"、"bundled" 或 "unavailable"。
-inline const char* GameInputRuntimeSource() {
-  switch (static_cast<gamepads_windows_gameinput::Source>(
-      gamepads_windows_gameinput::current_source.load())) {
+// 运行库来源的名称："system"、"bundled" 或 "unavailable"。
+inline const char* GameInputRuntimeSource(int source) {
+  switch (static_cast<gamepads_windows_gameinput::Source>(source)) {
     case gamepads_windows_gameinput::Source::inbox:
       return "system";
     case gamepads_windows_gameinput::Source::bundled:
@@ -135,9 +135,8 @@ inline const char* GameInputRuntimeSource() {
 
 // 系统运行库由 GameInput 服务按前台窗口过滤输入；附带运行库没有该服务，部分
 // 设备在应用失焦后仍上报，因此仅在使用附带运行库时检查本进程是否拥有前台窗口。
-inline bool GamepadInputFocused() {
-  if (gamepads_windows_gameinput::current_source.load() !=
-      static_cast<int>(gamepads_windows_gameinput::Source::bundled))
+inline bool GamepadInputFocused(int source) {
+  if (source != static_cast<int>(gamepads_windows_gameinput::Source::bundled))
     return true;
   const HWND window = GetForegroundWindow();
   DWORD process = 0;

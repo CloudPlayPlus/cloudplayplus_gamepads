@@ -98,8 +98,7 @@ int main() {
     return 10;
   // 系统运行库或无运行库时不做前台检查（系统服务已过滤）。
   for (const auto source : {runtime::Source::none, runtime::Source::inbox}) {
-    runtime::current_source.store(static_cast<int>(source));
-    if (!GamepadInputFocused())
+    if (!GamepadInputFocused(static_cast<int>(source)))
       return 11;
   }
   return 0;
