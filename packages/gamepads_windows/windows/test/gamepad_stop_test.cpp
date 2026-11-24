@@ -77,24 +77,58 @@ static HRESULT TestCreate(TestInput** result) {
 // 替代系统运行库探测，CI 主机是否自带 GameInput.dll 不影响回归。
 #define GAMEPADS_WINDOWS_GAMEINPUT_RUNTIME_H_
 static bool runtime_available = false;
-inline bool GameInputRuntimeAvailable() {
-  return runtime_available;
+static HRESULT CreateGameInput(TestInput** result, int* source = nullptr) {
+  if (source)
+    *source = runtime_available ? 2 : 0;  // 模拟附带运行库与不可用。
+  if (!runtime_available)
+    return HRESULT_FROM_WIN32(ERROR_MOD_NOT_FOUND);
+  return TestCreate(result);
+}
+static bool GamepadInputFocused(int) {
+  return true;
 }
 #define IGameInput TestInput
 #define IGameInputDevice TestDevice
 #define IGameInputReading TestReading
-#define GameInputCreate TestCreate
 #include "../gamepad.cpp"
-#undef GameInputCreate
 #undef IGameInputReading
 #undef IGameInputDevice
 #undef IGameInput
 
+// 失焦只发一次松开，之后不转发；回到前台从中立状态补齐仍按下的键。
+static int CheckFocusGate() {
+  GameInputGamepadState previous{};
+  GameInputGamepadState pressed{};
+  pressed.buttons = GameInputGamepadA;
+  pressed.leftTrigger = 0.5f;
+  if (next_events(previous, pressed, true).size() != 2)
+    return 20;
+  const auto released = next_events(previous, pressed, false);
+  if (released.size() != 2)
+    return 21;
+  for (const auto& event : released) {
+    if (event.value != 0.0)
+      return 22;
+  }
+  GameInputGamepadState other = pressed;
+  other.buttons |= GameInputGamepadB;
+  if (!next_events(previous, other, false).empty())
+    return 23;
+  if (next_events(previous, other, true).size() != 3)
+    return 24;
+  if (!next_events(previous, other, true).empty())
+    return 25;
+  return 0;
+}
+
 int main() {
+  if (const int failed = CheckFocusGate())
+    return failed;
   Gamepads pads;
-  // 缺少运行库：不得调用 GameInputCreate，停止仍安全且可重复。
+  // 缺少运行库：不得创建输入对象，停止仍安全且可重复。
   pads.init();
-  if (creates != 0 || !pads.get_gamepads().empty())
+  if (creates != 0 || !pads.get_gamepads().empty() ||
+      pads.runtime_source() != 0)
     return 10;
   pads.stop();
   pads.stop();
@@ -106,7 +140,8 @@ int main() {
   if (WaitForSingleObject(reading_entered, 2000) != WAIT_OBJECT_0)
     return 1;
   const auto snapshot = pads.get_gamepads();
-  if (snapshot.size() != 1 || input.device.refs != 1)
+  if (snapshot.size() != 1 || input.device.refs != 1 ||
+      pads.runtime_source() != 2)
     return 2;
   std::atomic<bool> stopped{false};
   std::thread stop([&] {

@@ -11,7 +11,6 @@
 #include <GameInput.h>
 #include <iomanip>
 #include <sstream>
-#pragma comment(lib, "GameInput.lib")
 
 Gamepads gamepads;
 
@@ -113,10 +112,26 @@ bool are_states_different(const GameInputGamepadState& a,
          a.rightTrigger != b.rightTrigger || a.buttons != b.buttons;
 }
 
+// 返回本轮应转发的事件并更新 previous。失焦时目标为全部松开的中立状态：只在
+// 失焦那一刻发一次松开，之后不再转发；回到前台时从中立状态补齐当前按下的键。
+std::list<Event> next_events(GameInputGamepadState& previous,
+                             const GameInputGamepadState& current,
+                             bool focused) {
+  const GameInputGamepadState target =
+      focused ? current : GameInputGamepadState{};
+  if (!are_states_different(previous, target))
+    return {};
+  auto events = diff_states(previous, target);
+  previous = target;
+  return events;
+}
+
 void Gamepads::init() {
   stopping_ = false;
-  if (!GameInputRuntimeAvailable() || FAILED(GameInputCreate(&input_)) ||
-      !input_)
+  int source = 0;
+  const HRESULT created = CreateGameInput(&input_, &source);
+  runtime_source_ = source;
+  if (FAILED(created) || !input_)
     return;
   const auto hr = input_->RegisterDeviceCallback(
       nullptr, GameInputKindGamepad, GameInputDeviceConnected,
@@ -224,13 +239,11 @@ void Gamepads::read_gamepad(Reader* reader) {
     input_->GetCurrentReading(GameInputKindGamepad, reader->device, &reading);
     if (reading) {
       if (reading->GetGamepadState(&state) && !reader->stopping) {
-        if (are_states_different(previous_state, state)) {
-          for (const auto& event : diff_states(previous_state, state)) {
-            if (event_emitter)
-              (*event_emitter)(&reader->data, event);
-          }
+        for (const auto& event : next_events(
+                 previous_state, state, GamepadInputFocused(runtime_source_))) {
+          if (event_emitter)
+            (*event_emitter)(&reader->data, event);
         }
-        previous_state = state;
       }
       reading->Release();
     }

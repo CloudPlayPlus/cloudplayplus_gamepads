@@ -47,6 +47,8 @@ class Gamepads {
   std::mutex mutex_;
   bool stopping_ = false;
   IGameInput* input_ = nullptr;
+  // 本对象创建输入时实际使用的运行库（gameinput_runtime.h 的 Source）。
+  std::atomic<int> runtime_source_{0};
 
   GameInputCallbackToken deviceCallbackToken{};
   void read_gamepad(Reader* reader);
@@ -59,6 +61,7 @@ class Gamepads {
       event_emitter;
   void init();
   void stop();
+  int runtime_source() const { return runtime_source_.load(); }
   std::list<GamepadData> get_gamepads();
 };
 
